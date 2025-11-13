@@ -1,0 +1,16 @@
+{
+  "name": "candy-anon-edge",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "npx azure-functions-core-tools@4 start"
+  },
+  "dependencies": {
+    "bip32": "^5.0.0-rc.0",
+    "bitcoinjs-lib": "^6.1.7",
+    "bs58check": "^4.0.0",
+    "dotenv": "^16.4.5",
+    "openpgp": "^5.11.1",
+    "tiny-secp256k1": "^2.2.4"
+  }
+}

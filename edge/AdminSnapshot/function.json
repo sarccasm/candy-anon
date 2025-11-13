@@ -1,0 +1,13 @@
+{
+  "bindings": [
+    {
+      "authLevel": "function",
+      "type": "httpTrigger",
+      "direction": "in",
+      "methods": ["get", "options"],
+      "route": "dash/snapshot",
+      "name": "req"
+    },
+    { "type": "http", "direction": "out", "name": "res" }
+  ]
+}

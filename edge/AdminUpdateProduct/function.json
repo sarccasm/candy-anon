@@ -1,0 +1,13 @@
+{
+  "bindings": [
+    {
+      "authLevel": "function",
+      "type": "httpTrigger",
+      "direction": "in",
+      "methods": ["post", "options"],
+      "route": "dash/products/update",
+      "name": "req"
+    },
+    { "type": "http", "direction": "out", "name": "res" }
+  ]
+}

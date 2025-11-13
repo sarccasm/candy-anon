@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Candy — anonymous sweets</title>
+
+  <meta http-equiv="Referrer-Policy" content="no-referrer">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="Permissions-Policy" content="geolocation=(), microphone=(), camera=()">
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' https://unpkg.com;
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data:;
+    font-src 'self';
+    connect-src 'self' http://localhost:7071 https://api.mycandy.app wss://api.mycandy.app https://blockstream.info;
+    object-src 'none';
+    base-uri 'none';
+    form-action 'self';">
+
+  <style>
+    :root{
+      --bg:#0b1220;
+      --bg2:#0e1526;
+      --glow:#ffd39a;
+      --glow-2:#ffb75e;
+      --muted:#8a93a7;
+      --card:#101a2f;
+      --line:rgba(255,255,255,.06);
+      --chip:#0f1830;
+      --chip-border:rgba(255,255,255,.12);
+      --btn-grad:linear-gradient(90deg,#ffb84d,#ff7b54,#e14eff);
+      --glass:rgba(255,255,255,.06);
+      --err:#ff4d4f;
+      --err-soft:rgba(255,77,79,.15);
+      --note:#aab3c5;
+      --note-strong:#8aa0ff;
+      --note-err:#ff9aa0;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
+      color:#e6ecff;
+      background:
+        radial-gradient(900px 380px at 20% 20%, rgba(255,184,77,.10), transparent 60%),
+        radial-gradient(900px 380px at 80% 20%, rgba(225,78,255,.10), transparent 60%),
+        linear-gradient(#0a1020, #0a1122 30%, #0a1122 70%, #0c1226);
+      background-color:var(--bg);
+    }
+
+    .container{max-width:1180px;margin:0 auto;padding:0 20px}
+
+    .nav{
+      position:fixed;inset-inline:0;top:0;height:64px;z-index:50;
+      backdrop-filter:saturate(160%) blur(10px);
+      background:rgba(6,10,22,.55);
+      border-bottom:1px solid var(--line);
+    }
+    .nav-inner{height:64px;display:flex;align-items:center;justify-content:space-between}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:700}
+    .dot{width:22px;height:22px;border-radius:8px;background:conic-gradient(from 180deg at 50% 50%, #ffb84d, #ff7b54, #e14eff, #7aa2ff, #ffb84d);filter:saturate(130%)}
+    .menu{display:flex;gap:10px;align-items:center}
+
+    .chip,.btn{
+      border:1px solid var(--chip-border);
+      background:var(--chip);
+      color:#e6ecff; border-radius:14px; padding:10px 14px;
+      cursor:pointer; transition:transform .06s ease, box-shadow .2s, background .2s, border-color .2s;
+    }
+    .chip:hover{border-color:#2a3553;background:#121d3a}
+    .btn-grad{
+      border:0;color:#0b0f1e;background:var(--btn-grad);border-radius:22px;padding:12px 22px;
+      font-weight:800;letter-spacing:.2px;
+      box-shadow:0 10px 36px rgba(255,184,77,.18), 0 6px 18px rgba(225,78,255,.12);
+      cursor:pointer;
+    }
+    .btn-grad:disabled{opacity:.6;cursor:not-allowed}
+
+    .hero{min-height:92vh;display:grid;place-items:center;position:relative;overflow:hidden}
+    .badges{position:absolute;top:108px;left:0;right:0;display:flex;justify-content:center;gap:min(9vw,120px);opacity:.9}
+    .badge{display:flex;align-items:center;gap:8px;color:#b9c3df;font-size:13px;letter-spacing:.12em;text-transform:uppercase}
+    .stars{letter-spacing:2px;color:#ffcd7a}
+
+    .title{
+      text-align:center;line-height:.9;margin-top:-40px;
+      text-shadow:
+        0 0 24px rgba(255,197,120,.25),
+        0 0 60px rgba(255,180,90,.18),
+        0 2px 0 rgba(0,0,0,.35);
+    }
+    .title span{
+      display:inline-block;
+      font-weight:900;
+      font-size:clamp(44px,8.6vw,132px);
+      color:var(--glow);
+      filter:drop-shadow(0 12px 40px rgba(255,184,77,.22));
+      transform:translateY(-120px) rotate(-5deg);
+      opacity:0; animation:drop .9s forwards;
+    }
+    .title span.space{width:.6ch}
+    @keyframes drop{60%{transform:translateY(8px) rotate(0);opacity:1}100%{transform:translateY(0) rotate(0);opacity:1}}
+    .subtitle{margin-top:14px;text-align:center;color:var(--muted)}
+
+    .cta{margin-top:32px;display:flex;justify-content:center;gap:12px}
+
+    section{padding:90px 0}
+    .hidden{display:none!important}
+
+    .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:18px}
+    .search{position:relative;flex:1;min-width:240px}
+    .search input{
+      width:100%;padding:10px 12px 10px 38px;border:1px solid var(--chip-border);border-radius:14px;background:var(--glass);color:#e6ecff;
+      outline:none;
+    }
+    .search input::placeholder{color:#95a0ba}
+    .search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:.7}
+    .grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+
+    .card{
+      background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));
+      border:1px solid var(--line);border-radius:18px;padding:14px;
+      box-shadow:0 8px 34px rgba(5,10,24,.4), inset 0 1px 0 rgba(255,255,255,.03);
+      transition:transform .15s ease, box-shadow .2s, border-color .2s;
+    }
+    .card:hover{transform:translateY(-4px);border-color:rgba(255,184,77,.25);box-shadow:0 10px 40px rgba(255,184,77,.10)}
+    .bubble{width:64px;height:64px;border-radius:18px;position:relative;overflow:hidden;box-shadow:inset 0 12px 30px rgba(0,0,0,.18)}
+    .bglight{background:linear-gradient(135deg,#ffe6f7,#f6d2ff 40%,#d0b7ff)}
+    .bgpink{background:linear-gradient(135deg,#ff8db2,#e879f9,#a78bfa)}
+    .bgmint{background:linear-gradient(135deg,#34d399,#22d3ee,#60a5fa)}
+    .bgamber{background:linear-gradient(135deg,#ffb84d,#ff8a3d,#fde047)}
+    .bgchoc{background:linear-gradient(135deg,#0f172a,#1f2937,#4338ca)}
+
+    .card h3{margin:0 0 4px 0}
+    .card small{color:#94a0bb}
+    .row{display:flex;align-items:center;justify-content:space-between;margin-top:12px}
+
+    .overlay{position:fixed;inset:0;background:rgba(3,6,14,.62);z-index:60;opacity:0;pointer-events:none;transition:opacity .2s}
+    .overlay.show{opacity:1;pointer-events:auto}
+    .drawer{position:fixed;top:0;right:-420px;width:380px;max-width:96%;height:100%;z-index:61;background:#0b1224;border-left:1px solid var(--line);box-shadow:-8px 0 30px rgba(2,8,23,.45);padding:16px;transition:right .25s ease;display:flex;flex-direction:column}
+    .drawer.show{right:0}
+    .line{height:1px;background:var(--line);margin:10px 0}
+    .list{overflow:auto;flex:1;display:flex;flex-direction:column;gap:10px}
+    .row-mid{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .qtybtn{width:28px;height:28px;border-radius:100px;border:1px solid var(--chip-border);background:var(--chip);color:#e6ecff;cursor:pointer}
+    .box{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.03));border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 8px 30px rgba(2,8,23,.28)}
+    .muted{color:#a3acc3}
+    .kbd{background:#0e1733;border:1px solid #21305a;border-radius:6px;padding:2px 6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .qr{word-break:break-all;font-family:ui-monospace,Menlo,monospace}
+    .mt8{margin-top:8px}.mt12{margin-top:12px}.mt16{margin-top:16px}.right{display:flex;justify-content:flex-end}
+    @keyframes pulseOnce{0%{box-shadow:0 0 0 rgba(244,63,94,0)}50%{box-shadow:0 0 0 12px rgba(255,184,77,.14)}100%{box-shadow:0 0 0 rgba(244,63,94,0)}}.pulse{animation:pulseOnce .8s ease-out}
+    .success{display:flex;align-items:center;gap:12px}
+    .check{width:36px;height:36px;border-radius:9999px;background:#10b981;display:grid;place-items:center;color:#fff}
+
+    .visually-hidden{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+    /* === forms / validation === */
+    .fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+    .field{display:flex;flex-direction:column;gap:6px;min-width:200px}
+    .field .note{font-size:12px;color:var(--note);min-height:1em}
+    .note{font-size:12px;color:var(--note)}
+    .field.error .chip{border-color:var(--err);box-shadow:0 0 0 3px var(--err-soft) inset}
+    .field.error .note{color:var(--note-err)}
+    #inlineError{margin-top:8px}
+    .chip.xs{padding:4px 8px;font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <div class="container nav-inner">
+      <div class="brand">
+        <div class="dot"></div>
+        <span>CandyAnon</span>
+      </div>
+      <div class="menu">
+        <button id="btnHome" class="chip">Home</button>
+        <button id="btnOpenCart" class="chip">Shop / Cart (<span id="cartCount">0</span>)</button>
+        <button id="btnBrowse" class="chip">Browse</button>
+      </div>
+    </div>
+  </div>
+
+  <section id="hero" class="hero">
+    <div class="badges">
+      <div class="badge"><span class="stars">★★★★★</span> SUPER FAST SHIPPING</div>
+      <div class="badge"><span class="stars">★★★★★</span> BEST PRICE</div>
+      <div class="badge"><span class="stars">★★★★★</span> COMPLETELY ENCRYPTED</div>
+    </div>
+    <div class="container" style="text-align:center">
+      <div class="title" id="title"></div>
+      <div class="subtitle">Anonymous crypto checkout. No accounts. No trails.</div>
+      <div class="cta">
+        <button id="btnBuy" class="btn-grad">PREPARE YOUR COINS</button>
+        <button id="btnBrowse2" class="chip">Browse ↓</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="catalog" class="container hidden">
+    <div class="toolbar">
+      <div class="search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" stroke="#b6c1df" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <input id="q" placeholder="Search candies..." />
+      </div>
+      <select id="sort" class="chip">
+        <option value="none">No sorting</option>
+        <option value="asc">Cheaper first</option>
+        <option value="desc">Expensive first</option>
+      </select>
+    </div>
+    <div id="grid" class="grid"></div>
+    <div class="right mt16">
+      <button id="btnProceed" class="btn-grad">Proceed to checkout →</button>
+    </div>
+  </section>
+
+  <section id="checkout" class="container hidden">
+    <h2>Checkout</h2>
+    <div class="box">
+      <div id="cartList"></div>
+      <div class="line"></div>
+      <div class="row-mid" style="justify-content:space-between">
+        <span class="muted">Total</span>
+        <strong id="total" aria-live="polite">$0.00</strong>
+      </div>
+      <div class="line"></div>
+
+      <div class="fields">
+        <div class="field" id="field-name">
+          <label class="visually-hidden" for="fldName">Name</label>
+          <input id="fldName" name="name" autocomplete="name" required minlength="2" placeholder="Name" class="chip">
+          <small class="note"></small>
+        </div>
+        <div class="field" id="field-addr">
+          <label class="visually-hidden" for="fldAddr">Address / locker</label>
+          <input id="fldAddr" name="address" autocomplete="address-line1" required minlength="4" placeholder="Address / locker" class="chip">
+          <small class="note"></small>
+        </div>
+        <div class="field" id="field-phone">
+          <label class="visually-hidden" for="fldPhone">Phone</label>
+          <input id="fldPhone" name="tel" autocomplete="tel" inputmode="tel" required placeholder="Phone" class="chip">
+          <small class="note"></small>
+        </div>
+      </div>
+
+      <div id="inlineError" class="note"></div>
+
+      <div class="line"></div>
+      <div class="muted">Pay with BTC</div>
+      <div class="mt12">
+        <button id="btnContinuePay" class="btn-grad">Continue to pay</button>
+        <button id="btnBackToCatalog" class="chip">← Back to catalog</button>
+      </div>
+    </div>
+
+    <div id="payBox" class="box mt16 hidden">
+      <h3>Payment</h3>
+      <div class="muted">Send the exact amount to the address below:</div>
+      <div class="mt8"><b>Address</b> <button id="btnCopyAddress" class="chip xs" aria-label="Copy address">Copy</button></div>
+      <div id="payAddress" class="qr"></div>
+      <div class="mt8"><b>Amount</b> (sats): <span id="payAmount"></span></div>
+      <div class="mt8"><b>Token</b>: <span class="kbd" id="payToken"></span> <button id="btnCopyToken" class="chip xs" aria-label="Copy token">Copy</button></div>
+      <div class="mt8"><b>URI</b> (paste into wallet):
+        <div id="btcUri" class="qr"></div>
+        <div class="mt8" style="display:flex; gap:8px; flex-wrap:wrap">
+          <button id="btnOpenWallet" class="chip">Open in wallet</button>
+          <button id="btnCopyUri" class="chip" aria-label="Copy URI">Copy URI</button>
+        </div>
+      </div>
+      <div class="mt12 row-mid">
+        <button id="btnRefreshStatus" class="chip">Refresh status</button>
+        <span id="payStatus" class="note" aria-live="polite">Not paid yet</span>
+        <span id="countdown" class="note"></span>
+      </div>
+    </div>
+
+    <div id="walletHelp" class="box mt16 hidden">
+      <strong>Couldn’t open your wallet automatically.</strong>
+      <div class="muted mt8">
+        Copy the URI and paste it into your wallet, or scan the address manually.
+      </div>
+    </div>
+
+    <div id="result" class="box mt16 hidden"></div>
+  </section>
+
+  <div id="overlay" class="overlay"></div>
+  <aside id="drawer" class="drawer" aria-hidden="true" aria-modal="true" role="dialog">
+    <div class="row-mid" style="justify-content:space-between">
+      <strong>Cart</strong>
+      <button id="btnCloseCart" class="qtybtn" aria-label="Close cart">✕</button>
+    </div>
+    <div id="drawerList" class="list mt12"></div>
+    <div class="line"></div>
+    <div class="row-mid" style="justify-content:space-between">
+      <strong>Total</strong><strong id="drawerTotal" aria-live="polite">$0.00</strong>
+    </div>
+    <div class="mt12 right">
+      <button id="btnDrawerCheckout" class="btn-grad">Checkout →</button>
+    </div>
+  </aside>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

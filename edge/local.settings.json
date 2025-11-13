@@ -1,0 +1,17 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "ALLOW_ORIGIN": "http://localhost:5173",
+    "BLOCKSTREAM_API": "https://blockstream.info/api",
+    "ESPLORA_FALLBACK": "https://mempool.space/api",
+    "NETWORK": "mainnet",
+    "MIN_SATS": "50000",
+    "HMAC_SECRET": "dev-change-me-at-least-32-chars-long",
+    "XPUB": "zpub6rCfpa4yhnrL3rKEs3UASAi3qJnKai3bSxDWysFzeQwzuWXaeh45ZUxzboiAhU9rkLpsgTsoCWRD4WXe2EsPTEXzGShKp3fHLXpLbdnaq6m",
+    "DEBUG_PAYCREATE": "1"
+    
+  },
+  "ConnectionStrings": {}
+}

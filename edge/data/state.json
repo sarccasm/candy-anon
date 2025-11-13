@@ -1,0 +1,16 @@
+{
+  "products": [
+    { "id": "c1", "name": "Caramel Swirl", "price": 3.5, "tags": ["light"], "color": "bglight" },
+    { "id": "c2", "name": "Mint Blizz",    "price": 2.9, "tags": ["mint"],  "color": "bgmint"  },
+    { "id": "c3", "name": "Dark Bite",     "price": 4.2, "tags": ["dark"],  "color": "bgchoc"  },
+    { "id": "c4", "name": "Berry Pop",     "price": 3.1, "tags": ["fruit"], "color": "bgpink"  },
+    { "id": "c5", "name": "Zesty Lemon",   "price": 2.7, "tags": ["fruit"], "color": "bgamber" },
+    { "id": "c6", "name": "Nutty Crunch",  "price": 4.8, "tags": ["nuts"],  "color": "bgamber" },
+    { "id": "c7", "name": "Velvet Cocoa",  "price": 5.2, "tags": ["dark"],  "color": "bgchoc"  },
+    { "id": "c8", "name": "Honey Drop",    "price": 2.5, "tags": ["light"], "color": "bglight" }
+  ],
+  "analytics": { "users": 0, "hits": 0, "avg_session": "00:00:00", "pages_per_session": 0, "series": { "users": [], "hits": [], "avg": [], "pps": [] } },
+  "access": { "published": false },
+  "hosting": { "server_ip": "", "domain": "" },
+  "user": "admin"
+}

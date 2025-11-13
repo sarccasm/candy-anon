@@ -1,0 +1,10 @@
+{
+  "version": "2.0",
+  "logging": {
+    "applicationInsights": { "samplingSettings": { "isEnabled": false } },
+    "logLevel": { "default": "Warning", "Host.Results": "Error" }
+  },
+  "extensions": {
+    "http": { "routePrefix": "api" }
+  }
+}
