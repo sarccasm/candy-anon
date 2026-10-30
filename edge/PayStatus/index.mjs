@@ -124,7 +124,7 @@ export default async function (context, req) {
         const latest = await readJson(paths.paymentFile(token));
         if (!latest || latest.amountSats !== invoice.amountSats || latest.address !== address) throw new Error('invoice_changed');
         if (!latest.committed) {
-          const result = await commitStock(latest.items || {});
+          const result = await commitStock(latest.items || {}, token);
           if (!result?.ok) throw new Error('stock_commit_failed');
           await writeJson(paths.paymentFile(token), { ...latest, committed: true });
         }
