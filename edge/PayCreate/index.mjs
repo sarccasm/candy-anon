@@ -19,11 +19,12 @@ function usdToSats(usd) {
 }
 
 function normalizeItems(lines) {
-  const acc = {};
-  for (const l of (Array.isArray(lines) ? lines : [])) {
+  const acc = Object.create(null);
+  if (!Array.isArray(lines) || lines.length > 50) return null;
+  for (const l of lines) {
     const sku = String(l.sku || l.id || '').trim();
     const qty = Number(l.qty || l.quantity || 0);
-    if (!sku || qty <= 0) continue;
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(sku) || !Number.isSafeInteger(qty) || qty < 1 || qty > 100) return null;
     acc[sku] = (acc[sku] || 0) + qty;
   }
   return acc;
@@ -37,7 +38,7 @@ export default async function (context, req) {
     const body = req.body ?? {};
 
     const items = normalizeItems(body.lines);
-    const entries = Object.entries(items);
+    const entries = items ? Object.entries(items) : [];
     if (!entries.length || entries.length > 50 || entries.some(([sku,qty]) => !/^[a-zA-Z0-9_-]{1,64}$/.test(sku) || !Number.isSafeInteger(qty) || qty < 1 || qty > 100)) {
       return json(context.res, { error: 'invalid_cart' }, 400);
     }
