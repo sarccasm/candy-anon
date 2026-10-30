@@ -23,11 +23,10 @@ export default async function (context, req) {
       context.res = { status: 400, headers: { ...CORS, 'content-type':'application/json' }, body: JSON.stringify({ ok:false }) };
       return;
     }
-    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.headers['x-client-ip'] || req.connection?.remoteAddress || '';
     const row = {
       ts: Number(body.ts), sid: String(body.sid).slice(0,64), kind: body.kind || 'pv',
       page: (body.page||'').slice(0,256), ref: (body.ref||'').slice(0,256),
-      ua: (body.ua||'').slice(0,256), ip, dur_ms: Number(body.dur_ms||0)
+      dur_ms: Number(body.dur_ms||0)
     };
     await mkdir(dirname(LOG_PATH), { recursive: true });
     await appendFile(LOG_PATH, JSON.stringify(row) + '\n', 'utf8');
