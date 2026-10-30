@@ -1,0 +1,17 @@
+name: Security checks
+on:
+  push:
+  pull_request:
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: |
+          find edge frontend -type f \( -name '*.js' -o -name '*.mjs' \) ! -path '*/node_modules/*' -print0 | xargs -0 -n1 node --check
+      - name: Run security unit tests
+        run: node --test tests/*.test.mjs
