@@ -60,8 +60,7 @@ export default async function (context, req) {
   if (req.method !== 'GET')     return json(context.res, { error: 'method_not_allowed' }, 405);
 
   const token = String(req.query?.token || '').trim();
-  const amountSatsQ = req.query?.amountSats;
-  const debug = req.query?.debug === '1' || req.query?.debug === 'true';
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(token)) return json(context.res,{error:'invalid_token'},400);
 
   if (!token) return json(context.res, { error: 'missing_token' }, 400);
 
@@ -74,29 +73,11 @@ export default async function (context, req) {
 
   const address = invoice?.address?.trim();
 
-  const qNum   = Number(amountSatsQ);
-  const invNum = Number(invoice?.amountSats);
-  let need = 0;
-  if (Number.isFinite(qNum) && qNum > 0) need = qNum;
-  else if (Number.isFinite(invNum) && invNum > 0) need = invNum;
-
-  if (debug) {
-    return json(context.res, {
-      debug: true,
-      token,
-      address,
-      queryAmountRaw: amountSatsQ,
-      invoiceAmountRaw: invoice?.amountSats,
-      parsedQuery: qNum,
-      parsedInvoice: invNum,
-      need
-    }, 200);
-  }
-
-  if (!address || !Number.isFinite(need) || need <= 0) {
+  const need = Number(invoice?.amountSats);
+  if (!address || !Number.isSafeInteger(need) || need <= 0) {
     return json(context.res, {
       error: 'bad_invoice',
-      hint: 'call with ?debug=1 to inspect amounts'
+      detail: 'invalid invoice'
     }, 400);
   }
 
@@ -111,7 +92,7 @@ export default async function (context, req) {
     }, 502);
   }
 
-  const paid = res.receivedTotal >= need;
+  const paid = res.chain >= need;
 
   let confs = 0;
   if (paid) {
@@ -129,7 +110,7 @@ export default async function (context, req) {
       context.log.warn('[PayStatus] Failed to fetch confirmations:', e?.message || e);
     }
 
-    if (!invoice.committed) {
+    if (confs >= Math.max(1,Number(process.env.MIN_CONFIRMATIONS || 1)) && !invoice.committed) {
       const items = invoice.items || {};
       try {
         await commitStock(items);
@@ -141,5 +122,5 @@ export default async function (context, req) {
     }
   }
 
-  return json(context.res, { paid, confs, address }, 200);
+  return json(context.res, { paid: paid && confs >= Math.max(1,Number(process.env.MIN_CONFIRMATIONS || 1)), confs, address }, 200);
 }
