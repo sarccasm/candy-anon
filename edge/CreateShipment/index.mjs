@@ -4,13 +4,13 @@ loadEnv();
 import fs from 'fs/promises';
 import path from 'path';
 
-import { readJson, paths } from '../lib/store.mjs';
+import { readJson, paths, withFileLock } from '../lib/store.mjs';
 
 const OUT_DIR = path.resolve(process.cwd(), 'data', 'shipments');
 const ORIGIN = process.env.ALLOW_ORIGIN || process.env.ALLOWED_ORIGIN || 'https://mycandy.app';
 const MAX_ARMOR_LEN = Number(process.env.MAX_ARMOR_LEN || 32768);
 
-const SHIPMENT_TTL_MIN = Number(process.env.SHIPMENT_TTL_MIN || 60);
+
 
 const json = (context, code, body) => {
   context.res = {
@@ -28,7 +28,6 @@ const json = (context, code, body) => {
 const ensureOut = async () => { await fs.mkdir(OUT_DIR, { recursive: true }); };
 const isUuidV4 = (s) => typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
 const PGP_RE = /^-----BEGIN PGP MESSAGE-----[\s\S]+-----END PGP MESSAGE-----\s*$/;
-const minutesAgo = (iso) => { const t = new Date(iso).getTime(); return Number.isFinite(t) ? (Date.now() - t) / 60000 : Infinity; };
 
 export default async function (context, req) {
   if (req.method === 'OPTIONS') return json(context, 204, {});
@@ -48,21 +47,21 @@ export default async function (context, req) {
       try { invoice = await readJson(paths.paymentFile(token)); }
       catch { return json(context, 404, { error: 'invoice_not_found' }); }
       if (!invoice) return json(context, 404, {error:'invoice_not_found'});
-      const age = minutesAgo(invoice?.createdAt);
-      if (!Number.isFinite(age) || age > SHIPMENT_TTL_MIN) return json(context, 400, { error: 'invoice_expired' });
+
     }
 
     if (!invoice || invoice.committed !== true) return json(context,403,{error:'payment_not_confirmed'});
     await ensureOut();
-    const existing = await readJson(paths.shipmentFile(token));
-    if (existing) return json(context,409,{error:'shipment_already_created'});
-
-    const encFile = path.join(OUT_DIR, `${token}.enc.asc`);
-    await fs.writeFile(encFile, armored, 'utf8');
-
-    const out = { token, createdAt: new Date().toISOString(), encryptedFile: `${token}.enc.asc` };
-    const jsonFile = path.join(OUT_DIR, `${token}.json`);
-    await fs.writeFile(jsonFile, JSON.stringify(out, null, 2), 'utf8');
+    let duplicate = false;
+    await withFileLock(paths.shipmentFile(token) + '.lock', async () => {
+      const existing = await readJson(paths.shipmentFile(token));
+      if (existing) { duplicate = true; return; }
+      const encFile = path.join(OUT_DIR, `${token}.enc.asc`);
+      await fs.writeFile(encFile, armored, { encoding:'utf8', flag:'wx', mode:0o600 });
+      const out = { token, createdAt: new Date().toISOString(), encryptedFile: `${token}.enc.asc` };
+      await fs.writeFile(paths.shipmentFile(token), JSON.stringify(out, null, 2), { encoding:'utf8', flag:'wx', mode:0o600 });
+    });
+    if (duplicate) return json(context,409,{error:'shipment_already_created'});
 
     return json(context, 200, { ok: true });
   } catch (e) {
