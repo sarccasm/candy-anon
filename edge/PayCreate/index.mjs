@@ -7,7 +7,7 @@ import { writeJson, paths } from '../lib/store.mjs';
 import { hmacIndex, deriveAddress } from '../lib/derive-btc.mjs';
 import { reserveStock, getProducts } from '../lib/db.mjs';
 
-const USD_PER_BTC = Number(process.env.USD_PER_BTC || process.env.USD_PER_BTC_DEV || 65000);
+const USD_PER_BTC = Number(process.env.USD_PER_BTC);
 const MIN_SATS    = Number(process.env.MIN_SATS || 50000);
 const XPUB        = (process.env.XPUB || '').trim();
 const HMAC_SECRET = (process.env.HMAC_SECRET || '').trim();
