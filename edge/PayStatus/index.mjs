@@ -71,7 +71,7 @@ export default async function (context, req) {
     return json(context.res, { error: 'not_found' }, 404);
   }
 
-  const address = invoice?.address?.trim();
+  const address = typeof invoice?.address === 'string' ? invoice.address.trim() : '';
 
   const need = Number(invoice?.amountSats);
   if (!address || !Number.isSafeInteger(need) || need <= 0) {
