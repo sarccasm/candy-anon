@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { json, options } from '../lib/http.mjs';
 import { writeJson, paths } from '../lib/store.mjs';
 import { hmacIndex, deriveAddress } from '../lib/derive-btc.mjs';
-import { reserveStock, getProducts } from '../lib/db.mjs';
+import { getProducts } from '../lib/db.mjs';
 
 const USD_PER_BTC = Number(process.env.USD_PER_BTC);
 const MIN_SATS    = Number(process.env.MIN_SATS || 50000);
@@ -60,14 +60,8 @@ export default async function (context, req) {
       );
     }
 
-    {
-      const r = await reserveStock(items);
-      if (!r.ok) {
-        return json(context.res, {
-          error: r.error || 'reserve_failed',
-          sku: r.sku, need: r.need, have: r.have
-        }, 409);
-      }
+    for (const [sku,qty] of entries) {
+      if (catalog.get(sku).stock < qty) return json(context.res,{error:'out_of_stock',sku},409);
     }
 
     const token = crypto.randomUUID();
@@ -77,7 +71,6 @@ export default async function (context, req) {
       const idx = hmacIndex(HMAC_SECRET, token);
       address = deriveAddress(XPUB, idx);
     } catch (e) {
-      await import('../lib/db.mjs').then(m => m.releaseStock(items));
       return json(context.res,{ error:'xpub_derive_failed' },500);
     }
 
@@ -92,8 +85,7 @@ export default async function (context, req) {
       createdAt: new Date().toISOString()
     };
 
-    try { await writeJson(paths.paymentFile(token), invoice); }
-    catch (error) { await import('../lib/db.mjs').then(m => m.releaseStock(items)); throw error; }
+    await writeJson(paths.paymentFile(token), invoice);
 
     return json(context.res, {
       token, address, amountSats: Number(amountSats), source: 'xpub'
