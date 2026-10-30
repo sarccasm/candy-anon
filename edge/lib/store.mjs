@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.resolve(__dirname, '..', 'data');
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(__dirname, '..', 'data');
 const PAY_DIR = path.join(DATA_DIR, 'payments');
 const SHIP_DIR = path.join(DATA_DIR, 'shipments');
 const DASH_DIR = path.join(DATA_DIR, 'dash');
@@ -30,7 +30,8 @@ export async function writeText(file, str) { await ensureDir(path.dirname(file))
 export async function ensureDataLayout() { await Promise.all([ensureDir(DATA_DIR), ensureDir(PAY_DIR), ensureDir(SHIP_DIR), ensureDir(DASH_DIR)]); }
 
 export async function withFileLock(lockPath, fn) {
-  const fd = await fs.open(lockPath, 'wx').catch(() => null);
+  await ensureDir(path.dirname(lockPath));
+  const fd = await fs.open(lockPath, 'wx').catch(err => { if (err.code === 'EEXIST') return null; throw err; });
   if (!fd) throw new Error('lock_busy');
   try { return await fn(); }
   finally { await fd.close().catch(()=>{}); await fs.rm(lockPath).catch(()=>{}); }
