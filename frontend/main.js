@@ -127,9 +127,9 @@ function setPayUi({address,token,amountSats}){$("#payAddress")?.replaceChildren(
 
 async function createPaymentViaApi(totalUsd){
   const url=`${CONFIG.API_BASE}/pay/create`;
-  const amountSats=usdToSats(totalUsd);
+  
   const lines=cart.map(i=>({sku:i.id,qty:i.qty}));
-  const res=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({amountSats,lines})});
+  const res=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({lines})});
   if(!res.ok)throw new Error(String(res.status));
   return res.json();
 }
