@@ -54,6 +54,8 @@ export default async function (context, req) {
 
     if (!invoice || invoice.committed !== true) return json(context,403,{error:'payment_not_confirmed'});
     await ensureOut();
+    const existing = await readJson(paths.shipmentFile(token));
+    if (existing) return json(context,409,{error:'shipment_already_created'});
 
     const encFile = path.join(OUT_DIR, `${token}.enc.asc`);
     await fs.writeFile(encFile, armored, 'utf8');
