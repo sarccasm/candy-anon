@@ -9,7 +9,7 @@ import { readJson, paths } from '../lib/store.mjs';
 const OUT_DIR = path.resolve(process.cwd(), 'data', 'shipments');
 const ORIGIN = process.env.ALLOW_ORIGIN || process.env.ALLOWED_ORIGIN || 'https://mycandy.app';
 const MAX_ARMOR_LEN = Number(process.env.MAX_ARMOR_LEN || 32768);
-const REQUIRE_INVOICE = (process.env.REQUIRE_INVOICE || '1') === '1';
+
 const SHIPMENT_TTL_MIN = Number(process.env.SHIPMENT_TTL_MIN || 60);
 
 const json = (context, code, body) => {
@@ -27,7 +27,7 @@ const json = (context, code, body) => {
 
 const ensureOut = async () => { await fs.mkdir(OUT_DIR, { recursive: true }); };
 const isUuidV4 = (s) => typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
-const PGP_RE = /^-----BEGIN PGP (MESSAGE|PUBLIC KEY BLOCK|SIGNED MESSAGE)-----\r?\n\r?\n[\s\S]+?\r?\n-----END PGP (?:MESSAGE|PUBLIC KEY BLOCK|SIGNED MESSAGE)-----\s*$/;
+const PGP_RE = /^-----BEGIN PGP MESSAGE-----[\s\S]+-----END PGP MESSAGE-----\s*$/;
 const minutesAgo = (iso) => { const t = new Date(iso).getTime(); return Number.isFinite(t) ? (Date.now() - t) / 60000 : Infinity; };
 
 export default async function (context, req) {
@@ -44,7 +44,7 @@ export default async function (context, req) {
     if (armored.length > MAX_ARMOR_LEN) return json(context, 413, { error: 'payload_too_large' });
 
     let invoice = null;
-    if (REQUIRE_INVOICE) {
+    {
       try { invoice = await readJson(paths.paymentFile(token)); }
       catch { return json(context, 404, { error: 'invoice_not_found' }); }
       if (!invoice) return json(context, 404, {error:'invoice_not_found'});
@@ -59,6 +59,7 @@ export default async function (context, req) {
     await fs.writeFile(encFile, armored, 'utf8');
 
     const out = { token, createdAt: new Date().toISOString(), encryptedFile: `${token}.enc.asc` };
+    const jsonFile = path.join(OUT_DIR, `${token}.json`);
     await fs.writeFile(jsonFile, JSON.stringify(out, null, 2), 'utf8');
 
     return json(context, 200, { ok: true });
