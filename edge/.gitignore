@@ -1,2 +1,11 @@
-edge/.env
-edge/.env.local
+node_modules/
+.env
+.env.*
+!.env.example
+local.settings.json
+*.pem
+*.key
+.DS_Store
+data/payments/
+data/shipments/
+data/analytics.jsonl
