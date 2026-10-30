@@ -161,8 +161,22 @@ export async function releaseStock(items) {
   });
 }
 
-export async function commitStock(_items) {
-  return { ok: true };
+export async function commitStock(items) {
+  const entries = Object.entries(items || {});
+  if (!entries.length) return { ok: false, error: 'empty_cart' };
+  await ensureDataLayout();
+  return withFileLock(lockPaths.inventoryLock(), async () => {
+    const file = inventoryFilePath();
+    const inv = (await readJson(file)) || {};
+    for (const [sku, raw] of entries) {
+      const qty = Number(raw);
+      if (!/^[a-zA-Z0-9_-]{1,64}$/.test(sku) || !Number.isSafeInteger(qty) || qty < 1) return { ok: false, error:'invalid_items' };
+      if (!Number.isSafeInteger(inv[sku]) || inv[sku] < qty) return { ok: false, error:'out_of_stock', sku };
+    }
+    for (const [sku,qty] of entries) inv[sku] -= qty;
+    await writeJson(file,inv);
+    return {ok:true};
+  });
 }
 
 export async function updateProductPrice(id, price) {
