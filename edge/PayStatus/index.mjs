@@ -2,7 +2,7 @@ import { config as loadEnv } from 'dotenv';
 loadEnv();
 
 import { json, options } from '../lib/http.mjs';
-import { readJson, writeJson, paths } from '../lib/store.mjs';
+import { readJson, writeJson, paths, withFileLock } from '../lib/store.mjs';
 import { commitStock } from '../lib/db.mjs';
 
 const API1 = process.env.BLOCKSTREAM_API || 'https://blockstream.info/api';
@@ -92,35 +92,47 @@ export default async function (context, req) {
     }, 502);
   }
 
-  const paid = res.chain >= need;
-
+  const required = Math.max(1, Number(process.env.MIN_CONFIRMATIONS || 1));
+  if (!Number.isSafeInteger(required) || required > 100) return json(context.res,{error:'invalid_confirmation_config'},500);
+  let confirmedSats = 0;
   let confs = 0;
-  if (paid) {
-    try {
-      const txs = await withRetry(() => getJson(`${res.base}/address/${address}/txs`, { timeout: 8000 }));
-      const tip = await withRetry(() => getJson(`${res.base}/blocks/tip/height`, { timeout: 5000 }));
-      const heights = Array.isArray(txs)
-        ? txs.filter(t => t?.status?.confirmed).map(t => t.status.block_height)
-        : [];
-      if (heights.length && Number.isFinite(Number(tip))) {
-        const minH = Math.min(...heights);
-        confs = Math.max(0, Number(tip) - minH + 1);
+  try {
+    const txs = await withRetry(() => getJson(`${res.base}/address/${address}/txs`));
+    const tip = Number(await withRetry(() => getJson(`${res.base}/blocks/tip/height`)));
+    if (!Array.isArray(txs) || !Number.isSafeInteger(tip)) throw new Error('invalid_chain_data');
+    for (const tx of txs) {
+      if (!tx?.status?.confirmed || !Number.isSafeInteger(Number(tx.status.block_height))) continue;
+      const txConfs = tip - Number(tx.status.block_height) + 1;
+      if (txConfs < 1) continue;
+      const received = (Array.isArray(tx.vout) ? tx.vout : []).filter(v => v.scriptpubkey_address === address)
+        .reduce((sum,v) => sum + Number(v.value || 0), 0);
+      if (!Number.isSafeInteger(received) || received < 0) throw new Error('invalid_tx_value');
+      if (received > 0) {
+        confs = confs ? Math.min(confs, txConfs) : txConfs;
+        if (txConfs >= required) confirmedSats += received;
       }
-    } catch (e) {
-      context.log.warn('[PayStatus] Failed to fetch confirmations:', e?.message || e);
     }
-
-    if (confs >= Math.max(1,Number(process.env.MIN_CONFIRMATIONS || 1)) && !invoice.committed) {
-      const items = invoice.items || {};
-      try {
-        await commitStock(items);
-        invoice.committed = true;
-        await writeJson(paths.paymentFile(token), { ...invoice });
-      } catch (e) {
-        context.log.warn('[PayStatus] commitStock failed:', e?.message || e);
-      }
+    if (!Number.isSafeInteger(confirmedSats)) throw new Error('invalid_total');
+  } catch (e) {
+    context.log.warn('[PayStatus] Verification unavailable:', e?.message || e);
+    return json(context.res,{paid:false,confs:0,error:'verification_unavailable'},502);
+  }
+  const paid = confirmedSats >= need;
+  if (paid && !invoice.committed) {
+    try {
+      await withFileLock(paths.paymentFile(token) + '.lock', async () => {
+        const latest = await readJson(paths.paymentFile(token));
+        if (!latest || latest.amountSats !== invoice.amountSats || latest.address !== address) throw new Error('invoice_changed');
+        if (!latest.committed) {
+          const result = await commitStock(latest.items || {});
+          if (!result?.ok) throw new Error('stock_commit_failed');
+          await writeJson(paths.paymentFile(token), { ...latest, committed: true });
+        }
+      });
+    } catch (e) {
+      context.log.warn('[PayStatus] Invoice commit failed:', e?.message || e);
+      return json(context.res,{paid:false,confs,error:'commit_pending'},503);
     }
   }
-
-  return json(context.res, { paid: paid && confs >= Math.max(1,Number(process.env.MIN_CONFIRMATIONS || 1)), confs, address }, 200);
+  return json(context.res,{paid,confs,address},200);
 }
