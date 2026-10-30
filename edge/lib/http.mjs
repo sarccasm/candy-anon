@@ -1,5 +1,6 @@
+import { timingSafeEqual } from 'node:crypto';
 const ORIGIN = process.env.ALLOW_ORIGIN || '*';
-const ADMIN_KEY = process.env.ADMIN_KEY || 'dev123';
+const ADMIN_KEY = process.env.ADMIN_KEY || '';
 
 export const CORS_HEADERS = {
   'Access-Control-Allow-Origin': ORIGIN,
@@ -26,6 +27,8 @@ export const unauthorized = (res, msg = 'unauthorized') => json(res, { error: ms
 
 export function okAuth(req) {
   const h = req.headers || {};
-  const k = h['x-admin-key'] || h['X-Admin-Key'] || h['x-Admin-Key'] || req.query?.key;
-  return String(k || '') === ADMIN_KEY;
+  const k = h['x-admin-key'] || h['X-Admin-Key'] || h['x-Admin-Key'];
+  if (ADMIN_KEY.length < 24 || typeof k !== 'string') return false;
+  const a = Buffer.from(k), b = Buffer.from(ADMIN_KEY);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
