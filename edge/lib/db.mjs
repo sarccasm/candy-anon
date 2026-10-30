@@ -161,19 +161,24 @@ export async function releaseStock(items) {
   });
 }
 
-export async function commitStock(items) {
+export async function commitStock(items, token) {
+  if (typeof token !== 'string' || !/^[0-9a-f-]{36}$/i.test(token)) return {ok:false,error:'bad_token'};
   const entries = Object.entries(items || {});
   if (!entries.length) return { ok: false, error: 'empty_cart' };
   await ensureDataLayout();
   return withFileLock(lockPaths.inventoryLock(), async () => {
     const file = inventoryFilePath();
     const inv = (await readJson(file)) || {};
+    const settled = inv.__settled || {};
+    if (settled[token]) return {ok:true,alreadyCommitted:true};
     for (const [sku, raw] of entries) {
       const qty = Number(raw);
       if (!/^[a-zA-Z0-9_-]{1,64}$/.test(sku) || !Number.isSafeInteger(qty) || qty < 1) return { ok: false, error:'invalid_items' };
       if (!Number.isSafeInteger(inv[sku]) || inv[sku] < qty) return { ok: false, error:'out_of_stock', sku };
     }
     for (const [sku,qty] of entries) inv[sku] -= qty;
+    settled[token] = true;
+    inv.__settled = settled;
     await writeJson(file,inv);
     return {ok:true};
   });
