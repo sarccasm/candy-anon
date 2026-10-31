@@ -28,3 +28,10 @@ PENDING -> PARTIALLY_PAID / CONFIRMING / PAID; unpaid invoice becomes EXPIRED af
 - `purgeReconciledRecord`: no deletion without external blockchain reconciliation, durable journal acknowledgement and a retention-eligible state. A version mismatch prevents stale deletion.
 - Unit tests cover concurrency version conflicts, data isolation, and deletion safety gates.
 - No production Azure adapter, scheduler or actual deletion has been activated. **Memory state vanishes on process restart** and should never store live orders.
+
+## Phase 3: Azure Table conditional-write adapter
+- `AzureTemporaryStore` implements create, read, compare-and-swap and version-checked deletion with Azure Table ETags.
+- Pass a configured `@azure/data-tables` `TableClient`; this phase deliberately does not connect it to live checkout or deploy credentials. The table must exist.
+- Azure Table Storage is durable; `expiresAt` is an **application deadline**, NOT automatic Table Storage TTL. No deletion happens without reconciliation and an explicit worker.
+- Azure Table entities have size limits, so store only minimized JSON technical state. Do not store encrypted shipping payloads in this adapter.
+- Before production: separate a durable idempotency ledger from expiring order state; create an Azure reconciliation/retention worker, integration tests with Azurite + BTC regtest, rate limiting, secrets rotation and security review.
