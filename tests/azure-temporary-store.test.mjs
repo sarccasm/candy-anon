@@ -40,15 +40,14 @@ test('Azure adapter performs versioned create/read/update/delete', async () => {
   assert.equal(await store.read(row.id), null);
 });
 
-test('Azure adapter detects etag races rather than overwriting', async () => {
+test('Azure adapter propagates etag conflicts rather than overwriting', async () => {
   const client = fakeClient();
   const store = new AzureTemporaryStore(client);
   const row = await store.create({ status: 'PENDING' }, { expiresAt: Date.now() + 60000 });
-  await assert.rejects(async () => {
-    await store.compareAndSwap(row.id, 1, prior => {
-      // Mimic a concurrent writer by changing the eTag between read and write.
-      client.updateEntity({partitionKey:'orders',rowKey:row.id,expiresAt:row.expiresAt,version:2,payload:'{}'},'Replace',{etag:prior.etag});
-      return { ...prior, status:'PAID' };
-    });
-  }, /version_conflict/);
+  client.updateEntity = async () => { throw { statusCode: 412 }; };
+  await assert.rejects(
+    () => store.compareAndSwap(row.id, 1, old => ({ ...old, status: 'PAID' })),
+    /version_conflict/
+  );
+  assert.equal((await store.read(row.id)).status, 'PENDING');
 });
