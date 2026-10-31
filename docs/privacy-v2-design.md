@@ -22,3 +22,9 @@ PENDING -> PARTIALLY_PAID / CONFIRMING / PAID; unpaid invoice becomes EXPIRED af
 5. Testnet/regtest, full API integration tests and security review.
 
 **Nothing is automatically deleted by this PR.** The pure predicate `eligibleForPurge()` must never be used as the sole criterion for deletion without confirmed reconciliation and a durable tombstone.
+
+## Phase 2 prototype (implemented)
+- `MemoryTemporaryStore`: ephemeral test-only adapter with versioned compare-and-swap semantics and defensive copies.
+- `purgeReconciledRecord`: no deletion without external blockchain reconciliation, durable journal acknowledgement and a retention-eligible state. A version mismatch prevents stale deletion.
+- Unit tests cover concurrency version conflicts, data isolation, and deletion safety gates.
+- No production Azure adapter, scheduler or actual deletion has been activated. **Memory state vanishes on process restart** and should never store live orders.
