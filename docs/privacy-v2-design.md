@@ -35,3 +35,10 @@ PENDING -> PARTIALLY_PAID / CONFIRMING / PAID; unpaid invoice becomes EXPIRED af
 - Azure Table Storage is durable; `expiresAt` is an **application deadline**, NOT automatic Table Storage TTL. No deletion happens without reconciliation and an explicit worker.
 - Azure Table entities have size limits, so store only minimized JSON technical state. Do not store encrypted shipping payloads in this adapter.
 - Before production: separate a durable idempotency ledger from expiring order state; create an Azure reconciliation/retention worker, integration tests with Azurite + BTC regtest, rate limiting, secrets rotation and security review.
+
+## Phase 4: BTC reconciliation core (read-only)
+- `btc-reconciliation.mjs` verifies outputs destined to the expected address, sums confirmed and unconfirmed sats, enforces minimum confirmations and classifies pending/partial/confirming/paid/late states.
+- Duplicate txids, malformed amounts, invalid block heights and **incomplete transaction history** cause a fail-closed error.
+- The included Esplora first-page fetch helper **always reports incomplete history**. A robust paginated explorer with trusted tip/reorg checks is required before production settlement. Do not treat that helper alone as payment verification.
+- No real Bitcoin addresses, private keys or customer data are stored in this module. It does not mutate invoices, ship orders or delete records.
+- Outstanding work: complete paginated blockchain reader, reorg resilience, testnet/regtest integration and wiring to durable state transitions.
