@@ -5,6 +5,7 @@ import fs from 'fs/promises';
 import path from 'path';
 
 import { readJson, paths, withFileLock } from '../lib/store.mjs';
+import { hasEncryptedFulfillment } from '../lib/encrypted-fulfillment.mjs';
 
 const OUT_DIR = path.resolve(process.cwd(), 'data', 'shipments');
 const ORIGIN = process.env.ALLOW_ORIGIN || process.env.ALLOWED_ORIGIN || 'https://mycandy.app';
@@ -35,12 +36,10 @@ export default async function (context, req) {
 
   try {
     const { data, token } = req.body || {};
-    if (!data || !token) return json(context, 400, { error: 'missing_fields' });
+    if (!token) return json(context, 400, { error: 'missing_fields' });
     if (!isUuidV4(token)) return json(context, 400, { error: 'bad_token' });
 
-    const armored = String(data).trim();
-    if (!PGP_RE.test(armored)) return json(context, 400, { error: 'pgp_required', detail: 'Provide PGP armored block with a blank line after BEGIN' });
-    if (armored.length > MAX_ARMOR_LEN) return json(context, 413, { error: 'payload_too_large' });
+    if (data !== undefined) return json(context,400,{error:'use_encrypted_escrow'});
 
     let invoice = null;
     {
@@ -51,13 +50,12 @@ export default async function (context, req) {
     }
 
     if (!invoice || invoice.committed !== true) return json(context,403,{error:'payment_not_confirmed'});
+    if (!(await hasEncryptedFulfillment(token))) return json(context,409,{error:'encrypted_details_missing'});
     await ensureOut();
     let duplicate = false;
     await withFileLock(paths.shipmentFile(token) + '.lock', async () => {
       const existing = await readJson(paths.shipmentFile(token));
       if (existing) { duplicate = true; return; }
-      const encFile = path.join(OUT_DIR, `${token}.enc.asc`);
-      await fs.writeFile(encFile, armored, { encoding:'utf8', flag:'wx', mode:0o600 });
       const out = { token, createdAt: new Date().toISOString(), encryptedFile: `${token}.enc.asc` };
       await fs.writeFile(paths.shipmentFile(token), JSON.stringify(out, null, 2), { encoding:'utf8', flag:'wx', mode:0o600 });
     });
