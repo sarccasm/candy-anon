@@ -1,10 +1,7 @@
-import * as openpgp from "https://unpkg.com/openpgp@5.11.1/dist/openpgp.min.mjs";
+import { importRecipientKey, encryptDelivery } from "./pgp.js";
 
 const CONFIG = {
   API_BASE: "/api",
-  MIN_SATS: 50000,
-  USD_PER_BTC_DEV: 65000,
-  STATIC_FALLBACK: false,
   PUBKEY_URL: "/pubkey.asc",
   NAME_MIN: 2,
   NAME_MAX: 60,
@@ -39,15 +36,14 @@ let cachedPubKey = null;
 let STOCK = new Map();
 
 function usd(v){const n=Number(v);return Number.isFinite(n)?`$${n.toFixed(2)}`:"$0.00";}
-function usdToSats(v){return Math.max(CONFIG.MIN_SATS,Math.round((Number(v)/CONFIG.USD_PER_BTC_DEV)*1e8));}
 
 function normalizeCartSchema(){
   cart=(Array.isArray(cart)?cart:[]).map(it=>{
-    const src=CANDIES.find(c=>c.id===it.id);
-    const priceUsd=Number(it.priceUsd??src?.priceUsd??0);
-    const qty=Math.max(1,Number(it.qty??1));
-    return{ id:it.id??src?.id??"unknown", name:it.name??src?.name??"Item", priceUsd:Number.isFinite(priceUsd)?priceUsd:0, qty:Number.isFinite(qty)?qty:1 };
-  }).filter(x=>x.id&&Number.isFinite(x.priceUsd));
+    const src=CANDIES.find(c=>c.id===it?.id);
+    const qty=Number(it?.qty);
+    return src&&Number.isSafeInteger(qty)&&qty>0&&qty<=100
+      ? { id:src.id,name:src.name,priceUsd:src.priceUsd,qty } : null;
+  }).filter(Boolean);
 }
 
 function loadCart(){try{cart=JSON.parse(localStorage.getItem(LS_CART_KEY)||"[]");}catch{cart=[];}normalizeCartSchema();saveCart();}
@@ -125,7 +121,7 @@ function renderCheckoutCart(){
 
 function setPayUi({address,token,amountSats}){$("#payAddress")?.replaceChildren(document.createTextNode(address||""));const amt=Number(amountSats||0);if($("#payAmount"))$("#payAmount").textContent=String(amt);if($("#payToken"))$("#payToken").textContent=token||"";const btcStr=(amt/1e8).toFixed(8);const uri=`bitcoin:${address}?amount=${btcStr}`;if($("#btcUri"))$("#btcUri").textContent=uri;$("#payBox")?.classList.remove("hidden");}
 
-async function createPaymentViaApi(totalUsd){
+async function createPaymentViaApi(){
   const url=`${CONFIG.API_BASE}/pay/create`;
   
   const lines=cart.map(i=>({sku:i.id,qty:i.qty}));
@@ -163,16 +159,10 @@ async function getPubKey(){
   if(cachedPubKey)return cachedPubKey;
   const r=await fetch(CONFIG.PUBKEY_URL,{cache:"no-cache",headers:{accept:"text/plain"}});
   if(!r.ok)throw new Error("pubkey_fetch_failed");
-  let asc=await r.text();
-  asc=asc.replace(/^\uFEFF/,"").replace(/[\u200B-\u200D\u2060]/g,"").replace(/\r\n?/g,"\n").trim()+"\n";
-  const hasHead=asc.startsWith("-----BEGIN PGP PUBLIC KEY BLOCK-----");
-  const hasTail=asc.includes("\n-----END PGP PUBLIC KEY BLOCK-----");
-  if(!hasHead||!hasTail)throw new Error("pubkey_invalid_format");
-  try{
-    const key=await openpgp.readKey({armoredKey:asc});
-    cachedPubKey=key;
-    return key;
-  }catch{throw new Error("pubkey_parse_failed");}
+  const asc=await r.text();
+  const key=await importRecipientKey(asc);
+  cachedPubKey=key;
+  return key;
 }
 
 function validateInputs(){
@@ -187,10 +177,8 @@ function validateInputs(){
   return { ok, name, address, phone };
 }
 
-async function encryptPII({ name, address, phone }) {
-  const pub=await getPubKey();
-  const message=await openpgp.createMessage({ text: JSON.stringify({ name, address, phone }) });
-  return await openpgp.encrypt({ message, encryptionKeys: pub });
+async function encryptPII(details) {
+  return encryptDelivery(details,await getPubKey());
 }
 
 async function startPayment(){
@@ -201,15 +189,17 @@ async function startPayment(){
   const prevText=btn?.textContent;
   try{
     btn&&(btn.disabled=true,btn.textContent="Processing…");
-    const totalUsd=cartTotalUsd();
     payAmountSats=0;
     encryptedPII=await encryptPII(v);
     let addr="";let token="";
-    try{const d=await createPaymentViaApi(totalUsd);addr=d.address;token=d.token;payAmountSats=Number(d.amountSats);if(!Number.isSafeInteger(payAmountSats)||payAmountSats<=0)throw new Error('invalid_invoice');}
-    catch(e){if(!CONFIG.STATIC_FALLBACK)throw e;addr=($("#payAddress")?.textContent||"").trim();token=`static-${Date.now()}`;if(!addr)throw e;}
+    const d=await createPaymentViaApi();
+    const addr=String(d.address||"");
+    const token=String(d.token||"");
+    payAmountSats=Number(d.amountSats);
+    if(!/^[a-zA-Z0-9]{14,90}$/.test(addr)||!/^[0-9a-f-]{36}$/i.test(token)||!Number.isSafeInteger(payAmountSats)||payAmountSats<=0)throw new Error("invalid_invoice");
     payToken=token;setPayUi({address:addr,token,amountSats:payAmountSats});startCountdown(20*60*1000);startPolling();showInlineError("");await fetchStock();filterAndSort();
   }catch(e){
-    const map={pubkey_fetch_failed:"Не вдалося завантажити відкритий ключ.",pubkey_invalid_format:"Невірний формат файлу ключа.",pubkey_parse_failed:"Ключ пошкоджений або не підтримується."};
+    const map={pubkey_fetch_failed:"Не вдалося завантажити відкритий ключ.",invalid_public_key:"Невірний або непридатний ключ шифрування.",invalid_invoice:"Сервер повернув некоректний рахунок."};
     showInlineError(map[e?.message]||"Помилка під час шифрування/створення платежу");
     showDialog(map[e?.message]||"Помилка під час шифрування PGP.");
   }finally{
@@ -226,7 +216,7 @@ async function afterPaid(){
   const url=`${CONFIG.API_BASE}/create-shipment`;
   try{
     const res=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:payToken,data:encryptedPII})});
-    if(res.ok){$("#result")?.classList.remove("hidden");if($("#result"))$("#result").textContent="Order placed. Thank you!";cart=[];saveCart();renderDrawerList();renderCheckoutCart();}
+    if(res.ok||res.status===409){encryptedPII=null;payToken="";["fldName","fldAddr","fldPhone"].forEach(id=>{const f=$("#"+id);if(f)f.value="";});$("#result")?.classList.remove("hidden");if($("#result"))$("#result").textContent="Order placed. Thank you!";cart=[];saveCart();renderDrawerList();renderCheckoutCart();}
     else{showInlineError("Не вдалося створити відправлення");}
   }catch{showInlineError("Не вдалося створити відправлення");}
 }
@@ -235,10 +225,10 @@ function stopPolling(){clearInterval(pollTimer);pollTimer=null;}
 async function pollOnce(){
   if(!payToken||!payAmountSats)return;
   const url=`${CONFIG.API_BASE}/pay/status?token=${encodeURIComponent(payToken)}`;
-  let paid=false;
-  try{const res=await fetch(url);if(res.ok){const j=await res.json();paid=!!j.paid;}}catch{}
+  let paid=false;let unavailable=false;
+  try{const res=await fetch(url,{cache:"no-store"});if(res.ok){const j=await res.json();paid=j.paid===true;}else unavailable=true;}catch{unavailable=true;}
   const st=$("#payStatus");
-  if(paid){stopPolling();clearInterval(countdownTimer);if(st)st.textContent="Paid";await afterPaid();}else{if(st)st.textContent="Not paid yet";}
+  if(paid){stopPolling();clearInterval(countdownTimer);if(st)st.textContent="Paid";await afterPaid();}else{if(st)st.textContent=unavailable?"Payment status unavailable. Retrying…":"Not paid yet";}
 }
 function startPolling(){stopPolling();pollTimer=setInterval(pollOnce,10000);pollOnce();}
 
