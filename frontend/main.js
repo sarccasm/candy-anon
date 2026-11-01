@@ -127,9 +127,9 @@ function setPayUi({address,token,amountSats}){$("#payAddress")?.replaceChildren(
 
 async function createPaymentViaApi(totalUsd){
   const url=`${CONFIG.API_BASE}/pay/create`;
-  const amountSats=usdToSats(totalUsd);
+  
   const lines=cart.map(i=>({sku:i.id,qty:i.qty}));
-  const res=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({amountSats,lines})});
+  const res=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({lines})});
   if(!res.ok)throw new Error(String(res.status));
   return res.json();
 }
@@ -202,10 +202,10 @@ async function startPayment(){
   try{
     btn&&(btn.disabled=true,btn.textContent="Processing…");
     const totalUsd=cartTotalUsd();
-    payAmountSats=usdToSats(totalUsd);
+    payAmountSats=0;
     encryptedPII=await encryptPII(v);
     let addr="";let token="";
-    try{const d=await createPaymentViaApi(totalUsd);addr=d.address;token=d.token;}
+    try{const d=await createPaymentViaApi(totalUsd);addr=d.address;token=d.token;payAmountSats=Number(d.amountSats);if(!Number.isSafeInteger(payAmountSats)||payAmountSats<=0)throw new Error('invalid_invoice');}
     catch(e){if(!CONFIG.STATIC_FALLBACK)throw e;addr=($("#payAddress")?.textContent||"").trim();token=`static-${Date.now()}`;if(!addr)throw e;}
     payToken=token;setPayUi({address:addr,token,amountSats:payAmountSats});startCountdown(20*60*1000);startPolling();showInlineError("");await fetchStock();filterAndSort();
   }catch(e){
@@ -234,7 +234,7 @@ async function afterPaid(){
 function stopPolling(){clearInterval(pollTimer);pollTimer=null;}
 async function pollOnce(){
   if(!payToken||!payAmountSats)return;
-  const url=`${CONFIG.API_BASE}/pay/status?token=${encodeURIComponent(payToken)}&amountSats=${payAmountSats}`;
+  const url=`${CONFIG.API_BASE}/pay/status?token=${encodeURIComponent(payToken)}`;
   let paid=false;
   try{const res=await fetch(url);if(res.ok){const j=await res.json();paid=!!j.paid;}}catch{}
   const st=$("#payStatus");

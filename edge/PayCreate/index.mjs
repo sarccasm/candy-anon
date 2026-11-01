@@ -5,9 +5,9 @@ import crypto from 'node:crypto';
 import { json, options } from '../lib/http.mjs';
 import { writeJson, paths } from '../lib/store.mjs';
 import { hmacIndex, deriveAddress } from '../lib/derive-btc.mjs';
-import { reserveStock } from '../lib/db.mjs';
+import { getProducts } from '../lib/db.mjs';
 
-const USD_PER_BTC = Number(process.env.USD_PER_BTC || process.env.USD_PER_BTC_DEV || 65000);
+const USD_PER_BTC = Number(process.env.USD_PER_BTC);
 const MIN_SATS    = Number(process.env.MIN_SATS || 50000);
 const XPUB        = (process.env.XPUB || '').trim();
 const HMAC_SECRET = (process.env.HMAC_SECRET || '').trim();
@@ -19,11 +19,12 @@ function usdToSats(usd) {
 }
 
 function normalizeItems(lines) {
-  const acc = {};
-  for (const l of (Array.isArray(lines) ? lines : [])) {
+  const acc = Object.create(null);
+  if (!Array.isArray(lines) || lines.length > 50) return null;
+  for (const l of lines) {
     const sku = String(l.sku || l.id || '').trim();
     const qty = Number(l.qty || l.quantity || 0);
-    if (!sku || qty <= 0) continue;
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(sku) || !Number.isSafeInteger(qty) || qty < 1 || qty > 100) return null;
     acc[sku] = (acc[sku] || 0) + qty;
   }
   return acc;
@@ -36,19 +37,21 @@ export default async function (context, req) {
   try {
     const body = req.body ?? {};
 
-    const amountUsdIn  = Number(body.amountUsd ?? 0);
-    const amountSatsIn = Number((body.amountSats ?? '').toString().trim());
-    const items        = normalizeItems(body.lines); // { sku: qty, ... }
-
-    let amountSats = Number.isFinite(amountSatsIn) && amountSatsIn > 0
-      ? amountSatsIn
-      : usdToSats(amountUsdIn);
-
-    if (!Number.isFinite(amountSats) || amountSats <= 0) {
-      return json(context.res, { error: 'invalid_amount' }, 400);
+    const items = normalizeItems(body.lines);
+    const entries = items ? Object.entries(items) : [];
+    if (!entries.length || entries.length > 50 || entries.some(([sku,qty]) => !/^[a-zA-Z0-9_-]{1,64}$/.test(sku) || !Number.isSafeInteger(qty) || qty < 1 || qty > 100)) {
+      return json(context.res, { error: 'invalid_cart' }, 400);
     }
-    if (amountSats < MIN_SATS) amountSats = MIN_SATS;
-
+    const catalog = new Map((await getProducts()).map(p => [p.id,p]));
+    let cents = 0;
+    for (const [sku,qty] of entries) {
+      const product = catalog.get(sku);
+      if (!product || !Number.isFinite(product.price) || product.price <= 0) return json(context.res,{error:'invalid_product'},400);
+      cents += Math.round(product.price*100)*qty;
+    }
+    if (!Number.isSafeInteger(cents) || cents <= 0 || !Number.isFinite(USD_PER_BTC) || USD_PER_BTC <= 0) return json(context.res,{error:'invalid_price'},500);
+    const amountUsdIn = cents/100;
+    const amountSats = usdToSats(amountUsdIn);
     if (!(XPUB && HMAC_SECRET)) {
       return json(
         context.res,
@@ -57,14 +60,8 @@ export default async function (context, req) {
       );
     }
 
-    if (Object.keys(items).length > 0) {
-      const r = await reserveStock(items);
-      if (!r.ok) {
-        return json(context.res, {
-          error: r.error || 'reserve_failed',
-          sku: r.sku, need: r.need, have: r.have
-        }, 409);
-      }
+    for (const [sku,qty] of entries) {
+      if (catalog.get(sku).stock < qty) return json(context.res,{error:'out_of_stock',sku},409);
     }
 
     const token = crypto.randomUUID();
@@ -74,11 +71,7 @@ export default async function (context, req) {
       const idx = hmacIndex(HMAC_SECRET, token);
       address = deriveAddress(XPUB, idx);
     } catch (e) {
-      return json(
-        context.res,
-        { error: 'xpub_derive_failed', detail: DEBUG_ERR ? String(e?.message || e) : undefined },
-        500
-      );
+      return json(context.res,{ error:'xpub_derive_failed' },500);
     }
 
     const invoice = {

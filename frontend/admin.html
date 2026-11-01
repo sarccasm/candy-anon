@@ -214,8 +214,8 @@ a{color:inherit}
 <script type="module">
 const USE_API_PREFIX=false;
 const BASE=USE_API_PREFIX?'/api/dash':'/dash';
-let ADMIN_KEY=localStorage.getItem('mc_admin_key');if(!ADMIN_KEY){ADMIN_KEY=prompt('Enter admin key','dev123')||'dev123';localStorage.setItem('mc_admin_key',ADMIN_KEY)}
-const withKey=url=>`${url}${url.includes('?')?'&':'?'}key=${encodeURIComponent(ADMIN_KEY)}`;
+let ADMIN_KEY=sessionStorage.getItem('mc_admin_key');if(!ADMIN_KEY){ADMIN_KEY=prompt('Enter admin key')||'';sessionStorage.setItem('mc_admin_key',ADMIN_KEY)}
+const withKey=url=>url;
 const authInit=(init={})=>({...init,headers:{'x-admin-key':ADMIN_KEY,...(init.headers||{})}});
 const $=q=>document.querySelector(q),$$=q=>Array.from(document.querySelectorAll(q));
 const fmtUSD=v=>'$'+Number(v).toFixed(2);const fancy=n=>Number(n||0).toLocaleString('en-US');
