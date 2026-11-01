@@ -3,7 +3,7 @@ loadEnv();
 
 import crypto from 'node:crypto';
 import { json, options } from '../lib/http.mjs';
-import { writeJson, paths } from '../lib/store.mjs';
+import { invoiceStoreFromEnvironment } from '../lib/azure-invoices.mjs';
 import { hmacIndex, deriveAddress } from '../lib/derive-btc.mjs';
 import { getProducts } from '../lib/db.mjs';
 
@@ -85,7 +85,7 @@ export default async function (context, req) {
       createdAt: new Date().toISOString()
     };
 
-    await writeJson(paths.paymentFile(token), invoice);
+    await (await invoiceStoreFromEnvironment()).create(invoice);
 
     return json(context.res, {
       token, address, amountSats: Number(amountSats), source: 'xpub'
