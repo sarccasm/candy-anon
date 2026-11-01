@@ -1,5 +1,5 @@
 import { json, options } from '../lib/http.mjs';
-import { readJson, paths } from '../lib/store.mjs';
+import { invoiceStoreFromEnvironment } from '../lib/azure-invoices.mjs';
 import { validToken, validCiphertext } from '../lib/encrypted-fulfillment.mjs';
 import { azureEscrowFromEnvironment } from '../lib/azure-encrypted-escrow.mjs';
 
@@ -10,7 +10,7 @@ export default async function (context, req) {
   if (req.method !== 'POST') return json(context.res,{error:'method_not_allowed'},405);
   const {token,data} = req.body || {};
   if (!validToken(token) || !validCiphertext(data)) return json(context.res,{error:'invalid_payload'},400);
-  const invoice = await readJson(paths.paymentFile(token));
+  const invoice = await (await invoiceStoreFromEnvironment()).read(token);
   if (!invoice || invoice.token !== token) return json(context.res,{error:'not_found'},404);
   if (invoice.committed) return json(context.res,{error:'already_settled'},409);
   try {
