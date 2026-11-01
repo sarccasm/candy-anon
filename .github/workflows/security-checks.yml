@@ -17,7 +17,16 @@ jobs:
         run: npm ci --prefix frontend
       - name: Build frontend
         run: npm run build --prefix frontend
+      - name: Install Azure SDK integration dependencies
+        run: npm install --prefix edge --no-package-lock --ignore-scripts
+      - name: Start Azurite Table emulator
+        run: |
+          docker run -d --name azurite-table -p 10002:10002 mcr.microsoft.com/azure-storage/azurite:3.35.0 azurite-table --tableHost 0.0.0.0 --tablePort 10002
+          for i in $(seq 1 20); do if curl -s http://127.0.0.1:10002/ >/dev/null; then exit 0; fi; sleep 1; done
+          exit 1
       - name: Test browser PGP integration
         run: node --test frontend/tests/*.test.mjs
       - name: Run security unit tests
         run: node --test tests/*.test.mjs
+        env:
+          AZURITE_TABLE_CONNECTION_STRING: UseDevelopmentStorage=true
