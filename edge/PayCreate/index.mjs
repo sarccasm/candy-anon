@@ -7,6 +7,7 @@ import { invoiceStoreFromEnvironment } from '../lib/azure-invoices.mjs';
 import { hmacIndex, deriveAddress } from '../lib/derive-btc.mjs';
 import { getProducts } from '../lib/db.mjs';
 import { calculateInvoiceSats } from '../lib/btc-pricing.mjs';
+import { calculateLineCents } from '../lib/cart-pricing.mjs';
 
 const USD_PER_BTC = Number(process.env.USD_PER_BTC);
 const MIN_SATS    = Number(process.env.MIN_SATS || 50000);
@@ -45,14 +46,11 @@ export default async function (context, req) {
     let cents = 0;
     for (const [sku,qty] of entries) {
       const product = catalog.get(sku);
-      if (!product || typeof product.price !== 'number' || !Number.isFinite(product.price) || product.price <= 0)
-        return json(context.res,{error:'invalid_product'},400);
-      const priceCents=Math.round(product.price*100);
-      if (!Number.isSafeInteger(priceCents) || priceCents <= 0 ||
-          Math.abs(product.price*100-priceCents)>0.000001)
-        return json(context.res,{error:'invalid_product_price'},500);
-      const lineCents=priceCents*qty;
-      if (!Number.isSafeInteger(lineCents) || !Number.isSafeInteger(cents+lineCents))
+      if (!product) return json(context.res,{error:'invalid_product'},400);
+      let lineCents;
+      try { lineCents=calculateLineCents(product.price,qty); }
+      catch { return json(context.res,{error:'invalid_product_price'},500); }
+      if (!Number.isSafeInteger(cents+lineCents))
         return json(context.res,{error:'invalid_cart_total'},400);
       cents += lineCents;
     }
