@@ -5,6 +5,7 @@ import fs from 'fs/promises';
 import path from 'path';
 
 import { readJson, paths, withFileLock } from '../lib/store.mjs';
+import { invoiceStoreFromEnvironment } from '../lib/azure-invoices.mjs';
 import { azureEscrowFromEnvironment } from '../lib/azure-encrypted-escrow.mjs';
 
 const OUT_DIR = path.resolve(process.cwd(), 'data', 'shipments');
@@ -43,7 +44,7 @@ export default async function (context, req) {
 
     let invoice = null;
     {
-      try { invoice = await readJson(paths.paymentFile(token)); }
+      try { invoice = await (await invoiceStoreFromEnvironment()).read(token); }
       catch { return json(context, 404, { error: 'invoice_not_found' }); }
       if (!invoice) return json(context, 404, {error:'invoice_not_found'});
 
