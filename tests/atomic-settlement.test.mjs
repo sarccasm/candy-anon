@@ -73,3 +73,12 @@ test('never commits an expired quote',async()=>{
   await assert.rejects(()=>settleInvoiceAtomically(store,token,paid),/late_payment_manual_review/);
   assert.equal((await client.getEntity('invoices','stock:c1')).quantity,5);
 });
+
+test('rejects more than 50 SKU updates per atomic settlement',async()=>{
+  const {store,client}=await setup();
+  const key='invoices/'+token;
+  const original=client.rows.get(key);
+  const many=Object.fromEntries(Array.from({length:51},(_,i)=>['c'+i,1]));
+  client.rows.set(key,{...original,payload:JSON.stringify({...JSON.parse(original.payload),items:many})});
+  await assert.rejects(()=>settleInvoiceAtomically(store,token,paid),/invalid_items/);
+});
