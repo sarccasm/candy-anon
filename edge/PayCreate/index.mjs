@@ -52,9 +52,12 @@ export default async function (context, req) {
       if (!product || !Number.isFinite(product.price) || product.price <= 0) return json(context.res,{error:'invalid_product'},400);
       cents += Math.round(product.price*100)*qty;
     }
-    if (!Number.isSafeInteger(cents) || cents <= 0 || !Number.isFinite(USD_PER_BTC) || USD_PER_BTC <= 0) return json(context.res,{error:'invalid_price'},500);
+    if (!Number.isSafeInteger(cents) || cents <= 0 || !Number.isFinite(USD_PER_BTC) || USD_PER_BTC <= 0 ||
+        !Number.isSafeInteger(MIN_SATS) || MIN_SATS <= 0) return json(context.res,{error:'invalid_price'},500);
     const amountUsdIn = cents/100;
     const amountSats = usdToSats(amountUsdIn);
+    if (!Number.isSafeInteger(amountSats) || amountSats <= 0 || amountSats > 2100000000000000)
+      return json(context.res,{error:'invalid_btc_amount'},500);
     if (!(XPUB && HMAC_SECRET)) {
       return json(
         context.res,
