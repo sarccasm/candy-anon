@@ -28,7 +28,9 @@ export function transition(order, next, { now = Date.now(), reason } = {}) {
   if (!EDGES[order.status].includes(next)) throw new Error('invalid_transition');
   if (!Number.isFinite(now)) throw new Error('invalid_timestamp');
   if (next === 'PAID' && order.paymentVerified !== true) throw new Error('payment_not_verified');
-  if (next === 'FULFILLED' && order.fulfillmentAcknowledged !== true) throw new Error('fulfillment_not_acknowledged');
+  if (next === 'FULFILLMENT_PENDING' && order.paymentVerified !== true) throw new Error('payment_not_verified');
+  if (next === 'LATE_PAYMENT' && order.status !== 'EXPIRED') throw new Error('invalid_late_payment');
+  if (next === 'FULFILLED' && (order.fulfillmentAcknowledged !== true || order.paymentVerified !== true)) throw new Error('fulfillment_not_acknowledged');
   if (next === 'EXPIRED' && (!Number.isFinite(order.expiresAt) || now < order.expiresAt)) throw new Error('not_expired');
   return { ...order, status: next, updatedAt: new Date(now).toISOString(), ...(reason ? { reviewReason: reason } : {}) };
 }
