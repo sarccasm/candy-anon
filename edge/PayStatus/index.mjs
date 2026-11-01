@@ -45,9 +45,15 @@ export default async function (context, req) {
     return json(context.res,{paid:false,status:'LATE_PAYMENT',error:'manual_review_required'},409);
   if(invoice.committed!==true) {
     try {
+      const independentlyVerified = await observeBitcoinInvoice({address:invoice.address,
+        expectedSats:invoice.amountSats,requiredConfirmations:required,
+        baseUrl:providers[1]});
+      if(independentlyVerified.status!=='PAID' ||
+         independentlyVerified.eligibleSats < invoice.amountSats)
+        return json(context.res,{paid:false,status:'PROVIDER_DISAGREEMENT'},503);
       if(!(await (await azureEscrowFromEnvironment()).exists(token)))
         return json(context.res,{paid:false,status:'ESCROW_MISSING'},409);
-      const result=await settleInvoiceAtomically(await invoiceStoreFromEnvironment(),token,observation);
+      const result=await settleInvoiceAtomically(await invoiceStoreFromEnvironment(),token,independentlyVerified);
       if(!result.ok)throw Error('settlement_failed');
     } catch(e) {
       return json(context.res,{paid:false,status:'SETTLEMENT_PENDING',
