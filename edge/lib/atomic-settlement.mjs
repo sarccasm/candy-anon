@@ -14,6 +14,7 @@ export async function settleInvoiceAtomically(store, token, observation) {
   const entries=Object.entries(invoice.items||{});
   if(!entries.length||entries.length>50||entries.some(([sku,qty])=>!(/^[a-zA-Z0-9_-]{1,64}$/.test(sku))||
     !Number.isSafeInteger(qty)||qty<=0)) throw Error('invalid_items');
+  // A single Table batch allows at most 100 operations; enforce a tighter invoice limit.
   const actions=[];
   for(const [sku,qty] of entries){
     let stock;
@@ -26,6 +27,7 @@ export async function settleInvoiceAtomically(store, token, observation) {
   const clean={...invoice,committed:true,committedAt:new Date().toISOString(),
     settledSats:observation.eligibleSats};
   delete clean._etag;delete clean._version;
+  if(actions.length>=100)throw Error('transaction_too_large');
   actions.push(['update',{partitionKey:'invoices',rowKey:token,payload:JSON.stringify(clean),
     version:invoice._version+1},'Replace',{etag:invoice._etag}]);
   try { await store.client.submitTransaction(actions); }
