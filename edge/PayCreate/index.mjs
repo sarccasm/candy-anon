@@ -60,8 +60,13 @@ export default async function (context, req) {
       );
     }
 
-    for (const [sku,qty] of entries) {
-      if (catalog.get(sku).stock < qty) return json(context.res,{error:'out_of_stock',sku},409);
+    const inventoryStore=await invoiceStoreFromEnvironment();
+    for(const [sku,qty] of entries){
+      let current;
+      try { current=await inventoryStore.client.getEntity('invoices','stock:'+sku); }
+      catch { return json(context.res,{error:'inventory_unavailable'},503); }
+      if(!Number.isSafeInteger(current.quantity)||current.quantity<qty)
+        return json(context.res,{error:'out_of_stock',sku},409);
     }
 
     const token = crypto.randomUUID();
