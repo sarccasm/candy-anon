@@ -3,10 +3,11 @@ loadEnv();
 
 import { json, options } from '../lib/http.mjs';
 import { invoiceStoreFromEnvironment } from '../lib/azure-invoices.mjs';
+import { azureEscrowFromEnvironment } from '../lib/azure-encrypted-escrow.mjs';
+import { settleInvoiceAtomically } from '../lib/atomic-settlement.mjs';
 import { observeBitcoinInvoice } from '../lib/esplora-watcher.mjs';
 
-// Legacy file-backed payment endpoint. Kept fail-closed pending durable invoice
-// and inventory migration. Never trust an incomplete Esplora page for settlement.
+// Payment verification and durable settlement. Missing inventory or escrow fails closed.
 const providers = [process.env.BLOCKSTREAM_API || 'https://blockstream.info/api',
   process.env.ESPLORA_FALLBACK || 'https://mempool.space/api'];
 
@@ -42,10 +43,16 @@ export default async function (context, req) {
     Date.now()>Date.parse(invoice.createdAt)+20*60_000;
   if(expired&&!invoice.committed)
     return json(context.res,{paid:false,status:'LATE_PAYMENT',error:'manual_review_required'},409);
-  // A verified on-chain payment is NOT an inventory settlement.
-  // Only a durable, atomic inventory+invoice transaction may mark committed.
-  if (invoice.committed !== true)
-    return json(context.res,{paid:false,status:'SETTLEMENT_PENDING',
-      error:'durable_settlement_required'},503);
+  if(invoice.committed!==true) {
+    try {
+      if(!(await (await azureEscrowFromEnvironment()).exists(token)))
+        return json(context.res,{paid:false,status:'ESCROW_MISSING'},409);
+      const result=await settleInvoiceAtomically(await invoiceStoreFromEnvironment(),token,observation);
+      if(!result.ok)throw Error('settlement_failed');
+    } catch(e) {
+      return json(context.res,{paid:false,status:'SETTLEMENT_PENDING',
+        error:e?.message==='late_payment_manual_review'?'manual_review_required':'settlement_unavailable'},503);
+    }
+  }
   return json(context.res,{paid:true,status:'PAID',confs:observation.confirmations},200);
 }
