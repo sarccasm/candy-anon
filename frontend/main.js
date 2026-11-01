@@ -191,7 +191,6 @@ async function startPayment(){
     btn&&(btn.disabled=true,btn.textContent="Processing…");
     payAmountSats=0;
     encryptedPII=await encryptPII(v);
-    let addr="";let token="";
     const d=await createPaymentViaApi();
     const addr=String(d.address||"");
     const token=String(d.token||"");
