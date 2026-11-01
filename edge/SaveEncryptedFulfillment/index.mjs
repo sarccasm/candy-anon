@@ -10,7 +10,9 @@ export default async function (context, req) {
   if (req.method !== 'POST') return json(context.res,{error:'method_not_allowed'},405);
   const {token,data} = req.body || {};
   if (!validToken(token) || !validCiphertext(data)) return json(context.res,{error:'invalid_payload'},400);
-  const invoice = await (await invoiceStoreFromEnvironment()).read(token);
+  let invoice;
+  try { invoice = await (await invoiceStoreFromEnvironment()).read(token); }
+  catch { return json(context.res,{error:'invoice_store_unavailable'},503); }
   if (!invoice || invoice.token !== token) return json(context.res,{error:'not_found'},404);
   if (invoice.committed) return json(context.res,{error:'already_settled'},409);
   try {
