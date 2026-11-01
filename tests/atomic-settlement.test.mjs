@@ -56,3 +56,18 @@ test('stock shortages do not modify invoices or inventory',async()=>{
   await assert.rejects(()=>settleInvoiceAtomically(store,token,paid),/out_of_stock/);
   assert.equal((await store.read(token)).committed,false);
 });
+
+test('ETag collision leaves invoice uncommitted until a fresh retry',async()=>{
+  const {store,client}=await setup();
+  client.submitTransaction=async()=>{throw {statusCode:412};};
+  await assert.rejects(()=>settleInvoiceAtomically(store,token,paid),/settlement_conflict_retry/);
+  assert.equal((await store.read(token)).committed,false);
+  assert.equal((await client.getEntity('invoices','stock:c1')).quantity,5);
+});
+test('never commits an expired quote',async()=>{
+  const {store,client}=await setup();
+  const record=await store.read(token);
+  await store.compareAndSwap(token,record._etag,previous=>({...previous,createdAt:'2001-01-01T00:00:00Z'}));
+  await assert.rejects(()=>settleInvoiceAtomically(store,token,paid),/late_payment_manual_review/);
+  assert.equal((await client.getEntity('invoices','stock:c1')).quantity,5);
+});
