@@ -27,10 +27,12 @@ export default async function (context, req) {
   if(!Number.isSafeInteger(required)||required<1||required>100)
     return json(context.res,{error:'invalid_confirmation_config'},500);
   let observation;
+  let observedProvider;
   for(const baseUrl of providers) {
     try {
       observation=await observeBitcoinInvoice({address:invoice.address,expectedSats:invoice.amountSats,
         requiredConfirmations:required,baseUrl,expired:false});
+      observedProvider=baseUrl;
       break;
     } catch (error) {
       context.log?.warn?.('BTC provider failed verification');
@@ -45,7 +47,7 @@ export default async function (context, req) {
     return json(context.res,{paid:false,status:'LATE_PAYMENT',error:'manual_review_required'},409);
   if(invoice.committed!==true) {
     try {
-      if(providers[0]===providers[1])
+      if(providers[0]===providers[1] || observedProvider!==providers[0])
         return json(context.res,{paid:false,error:'independent_provider_required'},503);
       const independentlyVerified = await observeBitcoinInvoice({address:invoice.address,
         expectedSats:invoice.amountSats,requiredConfirmations:required,
