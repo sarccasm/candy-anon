@@ -6,17 +6,13 @@ import { json, options } from '../lib/http.mjs';
 import { invoiceStoreFromEnvironment } from '../lib/azure-invoices.mjs';
 import { hmacIndex, deriveAddress } from '../lib/derive-btc.mjs';
 import { getProducts } from '../lib/db.mjs';
+import { calculateInvoiceSats } from '../lib/btc-pricing.mjs';
 
 const USD_PER_BTC = Number(process.env.USD_PER_BTC);
 const MIN_SATS    = Number(process.env.MIN_SATS || 50000);
 const XPUB        = (process.env.XPUB || '').trim();
 const HMAC_SECRET = (process.env.HMAC_SECRET || '').trim();
 const DEBUG_ERR   = process.env.DEBUG_PAYCREATE === '1';
-
-function usdToSats(usd) {
-  const sats = Math.round((Number(usd || 0) / USD_PER_BTC) * 1e8);
-  return Math.max(MIN_SATS, sats);
-}
 
 function normalizeItems(lines) {
   const acc = Object.create(null);
@@ -52,9 +48,12 @@ export default async function (context, req) {
       if (!product || !Number.isFinite(product.price) || product.price <= 0) return json(context.res,{error:'invalid_product'},400);
       cents += Math.round(product.price*100)*qty;
     }
-    if (!Number.isSafeInteger(cents) || cents <= 0 || !Number.isFinite(USD_PER_BTC) || USD_PER_BTC <= 0) return json(context.res,{error:'invalid_price'},500);
+    if (!Number.isSafeInteger(cents) || cents <= 0 || !Number.isFinite(USD_PER_BTC) || USD_PER_BTC <= 0 ||
+        !Number.isSafeInteger(MIN_SATS) || MIN_SATS <= 0) return json(context.res,{error:'invalid_price'},500);
     const amountUsdIn = cents/100;
-    const amountSats = usdToSats(amountUsdIn);
+    let amountSats;
+    try { amountSats=calculateInvoiceSats(amountUsdIn,USD_PER_BTC,MIN_SATS); }
+    catch { return json(context.res,{error:'invalid_btc_amount'},500); }
     if (!(XPUB && HMAC_SECRET)) {
       return json(
         context.res,
