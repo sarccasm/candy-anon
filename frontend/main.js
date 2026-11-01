@@ -13,6 +13,7 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
 const LS_CART_KEY = "mc_cart";
+const SESSION_INVOICE_KEY = "mc_pending_invoice";
 
 const CANDIES = [
   { id: "c1", name: "Caramel Swirl", priceUsd: 3.5, tag: "light", color: "bglight" },
@@ -202,6 +203,7 @@ async function startPayment(){
     if(!escrow.ok)throw new Error("encrypted_escrow_failed");
     encryptedPII=null;
     payToken=token;
+    sessionStorage.setItem(SESSION_INVOICE_KEY,JSON.stringify({token,address:addr,amountSats:payAmountSats,createdAt:Date.now()}));
     ["fldName","fldAddr","fldPhone"].forEach(id=>{const field=$("#"+id);if(field)field.value="";});
     setPayUi({address:addr,token,amountSats:payAmountSats});startCountdown(20*60*1000);startPolling();showInlineError("");await fetchStock();filterAndSort();
   }catch(e){
@@ -225,7 +227,7 @@ async function afterPaid(){
   const url=`${CONFIG.API_BASE}/create-shipment`;
   try{
     const res=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:payToken})});
-    if(res.ok){encryptedPII=null;payToken="";["fldName","fldAddr","fldPhone"].forEach(id=>{const f=$("#"+id);if(f)f.value="";});$("#result")?.classList.remove("hidden");if($("#result"))$("#result").textContent="Order placed. Thank you!";cart=[];saveCart();renderDrawerList();renderCheckoutCart();}
+    if(res.ok){sessionStorage.removeItem(SESSION_INVOICE_KEY);encryptedPII=null;payToken="";["fldName","fldAddr","fldPhone"].forEach(id=>{const f=$("#"+id);if(f)f.value="";});$("#result")?.classList.remove("hidden");if($("#result"))$("#result").textContent="Order placed. Thank you!";cart=[];saveCart();renderDrawerList();renderCheckoutCart();}
     else if(res.status===409){showInlineError("Відправлення вже існує. Перевірте замовлення через підтримку.");}
     else{showInlineError("Не вдалося створити відправлення. Повторіть спробу.");}
   }catch{showInlineError("Не вдалося створити відправлення. Повторіть спробу.");}
@@ -250,7 +252,7 @@ function setupCopyButtons(){
   $("#btnCopyAddress")?.addEventListener("click",()=>{const t=$("#payAddress")?.textContent?.trim()||"";if(t)copyText(t);});
   $("#btnCopyToken")?.addEventListener("click",()=>{const t=$("#payToken")?.textContent?.trim()||"";if(t)copyText(t);});
   $("#btnCopyUri")?.addEventListener("click",()=>{const t=$("#btcUri")?.textContent?.trim()||"";if(t)copyText(t);});
-  $("#btnRefreshStatus")?.addEventListener("click",()=>pollOnce());
+  $("#btnRefreshStatus")?.addEventListener("click",()=>{if(payToken)pollOnce();});
 }
 function tryOpenWallet(){
   const uri=$("#btcUri")?.textContent?.trim();if(!uri)return;
@@ -278,5 +280,27 @@ function wireNav(){
 }
 function wireSearch(){$("#q")?.addEventListener("input",filterAndSort);$("#sort")?.addEventListener("change",filterAndSort);}
 
-async function init(){loadCart();animateTitle();await fetchStock();renderGrid(CANDIES);wireNav();wireSearch();setupCopyButtons();setStage("hero");}
+function resumePendingInvoice(){
+  try {
+    const raw=sessionStorage.getItem(SESSION_INVOICE_KEY);
+    if(!raw)return false;
+    const invoice=JSON.parse(raw);
+    if(!/^[0-9a-f-]{36}$/i.test(invoice.token)||
+       !/^[a-zA-Z0-9]{14,90}$/.test(invoice.address)||
+       !Number.isSafeInteger(invoice.amountSats)||invoice.amountSats<=0||
+       !Number.isFinite(invoice.createdAt))throw Error("invalid_resume");
+    payToken=invoice.token;payAmountSats=invoice.amountSats;
+    setPayUi(invoice);
+    const left=Math.max(0,20*60*1000-(Date.now()-invoice.createdAt));
+    startCountdown(left);
+    startPolling();
+    setStage("checkout");
+    showInlineError("Відновлено рахунок. Дані доставки вже зашифровані на сервері.");
+    return true;
+  }catch{
+    sessionStorage.removeItem(SESSION_INVOICE_KEY);
+    return false;
+  }
+}
+async function init(){loadCart();animateTitle();await fetchStock();renderGrid(CANDIES);wireNav();wireSearch();setupCopyButtons();if(!resumePendingInvoice())setStage("hero");}
 document.addEventListener("DOMContentLoaded",init);
