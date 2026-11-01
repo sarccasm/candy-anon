@@ -15,6 +15,9 @@ export default async function (context, req) {
   catch { return json(context.res,{error:'invoice_store_unavailable'},503); }
   if (!invoice || invoice.token !== token) return json(context.res,{error:'not_found'},404);
   if (invoice.committed) return json(context.res,{error:'already_settled'},409);
+  const created = Date.parse(invoice.createdAt);
+  if (!Number.isFinite(created) || Date.now() > created + 1200000)
+    return json(context.res,{error:'invoice_expired'},409);
   try {
     const escrow = await azureEscrowFromEnvironment();
     const result = await escrow.save(token,data);
