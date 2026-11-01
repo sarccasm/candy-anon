@@ -14,7 +14,9 @@ test('server controls payment amounts and status lookup', async () => {
   const status = await readFile(new URL('../edge/PayStatus/index.mjs', import.meta.url), 'utf8');
   assert.match(pay, /const catalog = new Map/);
   assert.doesNotMatch(pay, /body\.amountSats|body\.amountUsd/);
-  assert.match(status, /const need = Number\(invoice\?\.amountSats\)/);
+  assert.match(status, /observeBitcoinInvoice/);
+  assert.match(status, /invoice\.amountSats/);
+  assert.match(status, /verification_unavailable/);
   assert.doesNotMatch(status, /req\.query\?\.amountSats/);
 });
 
