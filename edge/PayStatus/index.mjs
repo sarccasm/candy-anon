@@ -39,8 +39,11 @@ export default async function (context, req) {
     }
   }
   if(!observation)return json(context.res,{paid:false,error:'verification_unavailable'},503);
-  if(observation.status!=='PAID')
+  if(observation.status!=='PAID') {
+    if(invoice.committed===true)
+      return json(context.res,{paid:false,status:'REORG_REVIEW',error:'manual_review_required'},409);
     return json(context.res,{paid:false,status:observation.status,confs:observation.confirmations},200);
+  }
   const issuedAt=Date.parse(invoice.createdAt);
   if(!Number.isFinite(issuedAt))return json(context.res,{paid:false,error:'invalid_invoice_timestamp'},503);
   const expired=Date.now()>issuedAt+20*60_000;
