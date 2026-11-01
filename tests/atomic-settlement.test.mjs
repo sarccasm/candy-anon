@@ -93,3 +93,24 @@ test('inconsistent committed invoice cannot be mistaken for settled',async()=>{
   await assert.rejects(()=>settleInvoiceAtomically(store,token,paid),/invalid_committed_invoice/);
   assert.equal((await client.getEntity('invoices','stock:c1')).quantity,5);
 });
+
+test('atomic settlement preserves stock row audit metadata',async()=>{
+  const {store,client}=await setup();
+  const key='invoices/stock:c1';
+  const original=client.rows.get(key);
+  client.rows.set(key,{...original,warehouse:'primary',reorderThreshold:2});
+  await settleInvoiceAtomically(store,token,paid);
+  const updated=await client.getEntity('invoices','stock:c1');
+  assert.equal(updated.quantity,3);
+  assert.equal(updated.warehouse,'primary');
+  assert.equal(updated.reorderThreshold,2);
+});
+test('parallel settlements cannot deduct stock twice',async()=>{
+  const {store,client}=await setup();
+  const result=await Promise.all([
+    settleInvoiceAtomically(store,token,paid),
+    settleInvoiceAtomically(store,token,paid)
+  ]);
+  assert.equal(result.every(x=>x.ok),true);
+  assert.equal((await client.getEntity('invoices','stock:c1')).quantity,3);
+});
