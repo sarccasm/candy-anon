@@ -22,7 +22,10 @@ export class AzureInvoiceStore {
     if(before._etag!==expectedEtag)throw Error('version_conflict');
     const next=updater(structuredClone(before));
     if(!next||next.token!==token||next.address!==before.address||
-      next.amountSats!==before.amountSats)throw Error('invalid_update');
+      next.amountSats!==before.amountSats||next.createdAt!==before.createdAt||
+      JSON.stringify(next.items)!==JSON.stringify(before.items)||
+      next.committed!==before.committed||next.settledSats!==before.settledSats)
+      throw Error('invalid_update');
     const { _etag, _version, ...clean }=next;
     try {
       await this.client.updateEntity({partitionKey:'invoices',rowKey:token,
