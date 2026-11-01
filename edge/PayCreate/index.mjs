@@ -22,10 +22,13 @@ function normalizeItems(lines) {
   const acc = Object.create(null);
   if (!Array.isArray(lines) || lines.length > 50) return null;
   for (const l of lines) {
+    if (!l || typeof l !== 'object' || Array.isArray(l)) return null;
     const sku = String(l.sku || l.id || '').trim();
-    const qty = Number(l.qty || l.quantity || 0);
+    const qty = Number(l.qty ?? l.quantity ?? 0);
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(sku) || !Number.isSafeInteger(qty) || qty < 1 || qty > 100) return null;
-    acc[sku] = (acc[sku] || 0) + qty;
+    const total = (acc[sku] || 0) + qty;
+    if (!Number.isSafeInteger(total) || total > 100) return null;
+    acc[sku] = total;
   }
   return acc;
 }
