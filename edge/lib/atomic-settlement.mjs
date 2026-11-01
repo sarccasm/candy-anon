@@ -3,12 +3,14 @@
 // through an authenticated, audited inventory migration before enabling checkout.
 export async function settleInvoiceAtomically(store, token, observation) {
   if (!store?.client?.submitTransaction) throw Error('transaction_not_supported');
+  if (typeof token !== 'string' || !/^[0-9a-f-]{36}$/i.test(token)) throw Error('invalid_token');
   if (observation?.status !== 'PAID' || !Number.isSafeInteger(observation.eligibleSats))
     throw Error('payment_unverified');
   const invoice=await store.read(token);
   if (!invoice) throw Error('invoice_not_found');
   if (invoice.committed===true) {
-    if (!Number.isSafeInteger(invoice.settledSats) || invoice.settledSats < invoice.amountSats)
+    if (observation.eligibleSats < invoice.amountSats ||
+        !Number.isSafeInteger(invoice.settledSats) || invoice.settledSats < invoice.amountSats)
       throw Error('invalid_committed_invoice');
     return {ok:true,alreadyCommitted:true};
   }
