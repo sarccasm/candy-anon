@@ -45,6 +45,8 @@ export default async function (context, req) {
     return json(context.res,{paid:false,status:'LATE_PAYMENT',error:'manual_review_required'},409);
   if(invoice.committed!==true) {
     try {
+      if(providers[0]===providers[1])
+        return json(context.res,{paid:false,error:'independent_provider_required'},503);
       const independentlyVerified = await observeBitcoinInvoice({address:invoice.address,
         expectedSats:invoice.amountSats,requiredConfirmations:required,
         baseUrl:providers[1]});
