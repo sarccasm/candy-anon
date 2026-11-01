@@ -1,6 +1,8 @@
 // Non-destructive retention planner. Requires durable authorization before any deletion.
 export function assessEscrowRetention(record, now=Date.now()) {
   if(!record || !Number.isFinite(now))throw new Error('invalid_record');
+  if(!['PAID','FULFILLED'].includes(record.paymentStatus))
+    return {eligible:false,reason:'not_fully_paid'};
   if(record.paymentStatus==='PARTIALLY_PAID' || record.paymentStatus==='CONFIRMING' ||
      record.paymentStatus==='LATE_PAYMENT' || record.paymentStatus==='MANUAL_REVIEW')
     return {eligible:false,reason:'unsettled_payment'};
