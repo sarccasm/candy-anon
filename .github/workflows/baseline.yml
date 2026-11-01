@@ -1,0 +1,15 @@
+name: Baseline checks
+on:
+  push:
+  pull_request:
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check application JavaScript syntax
+        run: |
+          find edge frontend -type f \( -name '*.js' -o -name '*.mjs' \) ! -path '*/node_modules/*' -print0 | xargs -0 -n1 node --check
