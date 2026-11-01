@@ -67,7 +67,9 @@ test('ETag collision leaves invoice uncommitted until a fresh retry',async()=>{
 test('never commits an expired quote',async()=>{
   const {store,client}=await setup();
   const record=await store.read(token);
-  await store.compareAndSwap(token,record._etag,previous=>({...previous,createdAt:'2001-01-01T00:00:00Z'}));
+  const key='invoices/'+token;
+  const raw=client.rows.get(key);
+  client.rows.set(key,{...raw,payload:JSON.stringify({...JSON.parse(raw.payload),createdAt:'2001-01-01T00:00:00Z'})});
   await assert.rejects(()=>settleInvoiceAtomically(store,token,paid),/late_payment_manual_review/);
   assert.equal((await client.getEntity('invoices','stock:c1')).quantity,5);
 });
