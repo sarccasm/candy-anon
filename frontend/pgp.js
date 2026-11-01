@@ -1,6 +1,8 @@
 import * as openpgp from 'openpgp';
 
 // Encrypt on the client. No plaintext PII is sent to our API.
+// Pin recipient key to prevent silent replacement of the published PGP key.
+export const RECIPIENT_FINGERPRINT = '03a747dccaeac2110ebefddfc23141930637370d';
 export function validateDeliveryDetails(details) {
   const { name, address, phone } = details || {};
   if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 60
@@ -17,9 +19,11 @@ export async function importRecipientKey(armored) {
       !normalized.includes('-----END PGP PUBLIC KEY BLOCK-----')) throw new Error('invalid_public_key');
   try {
     const key = await openpgp.readKey({ armoredKey: normalized });
+    if (key.getFingerprint().toLowerCase() !== RECIPIENT_FINGERPRINT) throw new Error('recipient_key_mismatch');
     await key.getEncryptionKey(); // Reject signing-only or unusable public keys.
     return key;
-  } catch {
+  } catch (error) {
+    if (error?.message === 'recipient_key_mismatch') throw error;
     throw new Error('invalid_public_key');
   }
 }
