@@ -7,6 +7,7 @@ import { azureEscrowFromEnvironment } from '../lib/azure-encrypted-escrow.mjs';
 import { settleInvoiceAtomically } from '../lib/atomic-settlement.mjs';
 import { observeBitcoinInvoice } from '../lib/esplora-watcher.mjs';
 import { paymentStatusForClient } from '../lib/payment-status-response.mjs';
+import { verifyIndependentPayment } from '../lib/independent-payment-check.mjs';
 
 // Payment verification and durable settlement. Missing inventory or escrow fails closed.
 const providers = [process.env.BLOCKSTREAM_API || 'https://blockstream.info/api',
@@ -49,16 +50,20 @@ export default async function (context, req) {
   const expired=Date.now()>issuedAt+20*60_000;
   if(expired&&!invoice.committed)
     return json(context.res,{paid:false,status:'LATE_PAYMENT',error:'manual_review_required'},409);
+  if(providers[0]===providers[1] || observedProvider!==providers[0])
+    return json(context.res,{paid:false,error:'independent_provider_required'},503);
+  let independentlyVerified;
+  try {
+    independentlyVerified=await observeBitcoinInvoice({address:invoice.address,
+      expectedSats:invoice.amountSats,requiredConfirmations:required,baseUrl:providers[1]});
+  } catch {
+    return json(context.res,{paid:false,error:'independent_verification_unavailable'},503);
+  }
+  if(!verifyIndependentPayment(observation,independentlyVerified,invoice.amountSats))
+    return json(context.res,{paid:false,status:invoice.committed?'REORG_REVIEW':'PROVIDER_DISAGREEMENT',
+      error:'manual_review_required'},409);
   if(invoice.committed!==true) {
     try {
-      if(providers[0]===providers[1] || observedProvider!==providers[0])
-        return json(context.res,{paid:false,error:'independent_provider_required'},503);
-      const independentlyVerified = await observeBitcoinInvoice({address:invoice.address,
-        expectedSats:invoice.amountSats,requiredConfirmations:required,
-        baseUrl:providers[1]});
-      if(independentlyVerified.status!=='PAID' ||
-         independentlyVerified.eligibleSats < invoice.amountSats)
-        return json(context.res,{paid:false,status:'PROVIDER_DISAGREEMENT'},503);
       if(!(await (await azureEscrowFromEnvironment()).exists(token)))
         return json(context.res,{paid:false,status:'ESCROW_MISSING'},409);
       const result=await settleInvoiceAtomically(await invoiceStoreFromEnvironment(),token,independentlyVerified);
