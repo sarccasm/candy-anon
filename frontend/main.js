@@ -198,11 +198,14 @@ async function startPayment(){
     const token=String(d.token||"");
     payAmountSats=Number(d.amountSats);
     if(!/^[a-zA-Z0-9]{14,90}$/.test(addr)||!/^[0-9a-f-]{36}$/i.test(token)||!Number.isSafeInteger(payAmountSats)||payAmountSats<=0)throw new Error("invalid_invoice");
+    const escrow=await fetch(`${CONFIG.API_BASE}/shipment/escrow`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token,data:encryptedPII})});
+    if(!escrow.ok)throw new Error("encrypted_escrow_failed");
+    encryptedPII=null;
     payToken=token;
     ["fldName","fldAddr","fldPhone"].forEach(id=>{const field=$("#"+id);if(field)field.value="";});
     setPayUi({address:addr,token,amountSats:payAmountSats});startCountdown(20*60*1000);startPolling();showInlineError("");await fetchStock();filterAndSort();
   }catch(e){
-    const map={pubkey_fetch_failed:"Не вдалося завантажити відкритий ключ.",invalid_public_key:"Невірний або непридатний ключ шифрування.",invalid_invoice:"Сервер повернув некоректний рахунок."};
+    const map={pubkey_fetch_failed:"Не вдалося завантажити відкритий ключ.",invalid_public_key:"Невірний або непридатний ключ шифрування.",invalid_invoice:"Сервер повернув некоректний рахунок.",encrypted_escrow_failed:"Не вдалося захищено зберегти дані доставки. Не надсилайте оплату."};
     encryptedPII=null;
     showInlineError(map[e?.message]||"Помилка під час шифрування/створення платежу");
     showDialog(map[e?.message]||"Помилка під час шифрування PGP.");
@@ -217,11 +220,11 @@ function startCountdown(ms){
 }
 
 async function afterPaid(){
-  if(submittingShipment||!encryptedPII||!payToken)return;
+  if(submittingShipment||!payToken)return;
   submittingShipment=true;
   const url=`${CONFIG.API_BASE}/create-shipment`;
   try{
-    const res=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:payToken,data:encryptedPII})});
+    const res=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:payToken})});
     if(res.ok){encryptedPII=null;payToken="";["fldName","fldAddr","fldPhone"].forEach(id=>{const f=$("#"+id);if(f)f.value="";});$("#result")?.classList.remove("hidden");if($("#result"))$("#result").textContent="Order placed. Thank you!";cart=[];saveCart();renderDrawerList();renderCheckoutCart();}
     else if(res.status===409){showInlineError("Відправлення вже існує. Перевірте замовлення через підтримку.");}
     else{showInlineError("Не вдалося створити відправлення. Повторіть спробу.");}
