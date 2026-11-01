@@ -7,7 +7,11 @@ export async function settleInvoiceAtomically(store, token, observation) {
     throw Error('payment_unverified');
   const invoice=await store.read(token);
   if (!invoice) throw Error('invoice_not_found');
-  if (invoice.committed===true) return {ok:true,alreadyCommitted:true};
+  if (invoice.committed===true) {
+    if (!Number.isSafeInteger(invoice.settledSats) || invoice.settledSats < invoice.amountSats)
+      throw Error('invalid_committed_invoice');
+    return {ok:true,alreadyCommitted:true};
+  }
   if (observation.eligibleSats < invoice.amountSats) throw Error('payment_underfunded');
   if (!Number.isFinite(Date.parse(invoice.createdAt)) ||
       Date.now()>Date.parse(invoice.createdAt)+20*60_000) throw Error('late_payment_manual_review');
@@ -34,7 +38,8 @@ export async function settleInvoiceAtomically(store, token, observation) {
   catch(e) {
     if([409,412].includes(e.statusCode)){
       const latest=await store.read(token);
-      if(latest?.committed)return {ok:true,alreadyCommitted:true};
+      if(latest?.committed && Number.isSafeInteger(latest.settledSats) && latest.settledSats>=latest.amountSats)
+        return {ok:true,alreadyCommitted:true};
       throw Error('settlement_conflict_retry');
     }
     throw e;
