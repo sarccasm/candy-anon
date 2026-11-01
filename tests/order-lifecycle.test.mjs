@@ -20,7 +20,7 @@ test('cannot claim payment without verification or fulfill without acknowledgmen
   assert.equal(transition(order, 'EXPIRED', { now: 1000 }).status, 'EXPIRED');
   assert.equal(transition({ status: 'EXPIRED' }, 'LATE_PAYMENT').status, 'LATE_PAYMENT');
   assert.throws(() => transition({status:'FULFILLMENT_PENDING'},'FULFILLED'),/fulfillment_not_acknowledged/);
-  assert.equal(transition({status:'FULFILLMENT_PENDING',fulfillmentAcknowledged:true},'FULFILLED').status,'FULFILLED');
+  assert.equal(transition({status:'FULFILLMENT_PENDING',fulfillmentAcknowledged:true,paymentVerified:true},'FULFILLED').status,'FULFILLED');
 });
 
 test('retention never purges unsettled or unacknowledged records', () => {
@@ -31,4 +31,9 @@ test('retention never purges unsettled or unacknowledged records', () => {
   assert.equal(eligibleForPurge({status:'EXPIRED',reconciliationEndsAt:100},100),true);
   assert.equal(eligibleForPurge({status:'FULFILLED',fulfillmentAcknowledged:false,purgeAfter:100},200),false);
   assert.equal(eligibleForPurge({status:'FULFILLED',fulfillmentAcknowledged:true,purgeAfter:100},200),true);
+});
+
+test('cannot hand off fulfillment before payment verification',()=>{
+  assert.throws(()=>transition({status:'PAID',paymentVerified:false},'FULFILLMENT_PENDING'),/payment_not_verified/);
+  assert.equal(transition({status:'PAID',paymentVerified:true},'FULFILLMENT_PENDING').status,'FULFILLMENT_PENDING');
 });
