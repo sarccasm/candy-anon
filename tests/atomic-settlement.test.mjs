@@ -82,3 +82,14 @@ test('rejects more than 50 SKU updates per atomic settlement',async()=>{
   client.rows.set(key,{...original,payload:JSON.stringify({...JSON.parse(original.payload),items:many})});
   await assert.rejects(()=>settleInvoiceAtomically(store,token,paid),/invalid_items/);
 });
+
+test('inconsistent committed invoice cannot be mistaken for settled',async()=>{
+  const {store,client}=await setup();
+  const key='invoices/'+token;
+  const current=client.rows.get(key);
+  client.rows.set(key,{...current,payload:JSON.stringify({
+    ...JSON.parse(current.payload),committed:true,settledSats:0
+  })});
+  await assert.rejects(()=>settleInvoiceAtomically(store,token,paid),/invalid_committed_invoice/);
+  assert.equal((await client.getEntity('invoices','stock:c1')).quantity,5);
+});
