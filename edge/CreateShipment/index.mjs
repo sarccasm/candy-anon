@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import path from 'path';
 
 import { readJson, paths, withFileLock } from '../lib/store.mjs';
-import { hasEncryptedFulfillment } from '../lib/encrypted-fulfillment.mjs';
+import { azureEscrowFromEnvironment } from '../lib/azure-encrypted-escrow.mjs';
 
 const OUT_DIR = path.resolve(process.cwd(), 'data', 'shipments');
 const ORIGIN = process.env.ALLOW_ORIGIN || process.env.ALLOWED_ORIGIN || 'https://mycandy.app';
@@ -50,7 +50,7 @@ export default async function (context, req) {
     }
 
     if (!invoice || invoice.committed !== true) return json(context,403,{error:'payment_not_confirmed'});
-    if (!(await hasEncryptedFulfillment(token))) return json(context,409,{error:'encrypted_details_missing'});
+    if (!(await (await azureEscrowFromEnvironment()).exists(token))) return json(context,409,{error:'encrypted_details_missing'});
     await ensureOut();
     let duplicate = false;
     await withFileLock(paths.shipmentFile(token) + '.lock', async () => {
