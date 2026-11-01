@@ -23,7 +23,16 @@ export async function fetchCompleteEsploraHistory({
       return await res.json().catch(() => { throw new Error('invalid_response'); });
     } finally { clearTimeout(timeout); }
   }
-  const tipBefore = await get('/blocks/tip/hash');
+  async function getTipHash() {
+    const ctrl=new AbortController();
+    const timeout=setTimeout(()=>ctrl.abort(),timeoutMs);
+    try {
+      const response=await fetchImpl(`${root}/blocks/tip/hash`,{signal:ctrl.signal});
+      if(!response.ok)throw new Error('provider_unavailable');
+      return (await response.text()).trim();
+    } finally {clearTimeout(timeout);}
+  }
+  const tipBefore = await getTipHash();
   if (typeof tipBefore !== 'string' || !HASH.test(tipBefore)) throw new Error('invalid_tip');
   const stats = await get(`/address/${address}`);
   const count = stats?.chain_stats?.tx_count;
@@ -50,7 +59,7 @@ export async function fetchCompleteEsploraHistory({
     if (chain.length > count) throw new Error('history_changed');
     if (page.length < 25 && chain.length < count) throw new Error('incomplete_history');
   }
-  const tipAfter = await get('/blocks/tip/hash');
+  const tipAfter = await getTipHash();
   if (tipAfter !== tipBefore) throw new Error('tip_changed_retry');
   const statsAfter = await get(`/address/${address}`);
   if (statsAfter?.chain_stats?.tx_count !== count) throw new Error('history_changed');
