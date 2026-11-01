@@ -1,6 +1,7 @@
 import { json, options } from '../lib/http.mjs';
 import { readJson, paths } from '../lib/store.mjs';
-import { validToken, validCiphertext, saveEncryptedFulfillment } from '../lib/encrypted-fulfillment.mjs';
+import { validToken, validCiphertext } from '../lib/encrypted-fulfillment.mjs';
+import { azureEscrowFromEnvironment } from '../lib/azure-encrypted-escrow.mjs';
 
 // Accept encrypted delivery details BEFORE payment, never plaintext. The random
 // invoice token acts as a bearer secret; deploy rate-limits and durable storage.
@@ -13,7 +14,8 @@ export default async function (context, req) {
   if (!invoice || invoice.token !== token) return json(context.res,{error:'not_found'},404);
   if (invoice.committed) return json(context.res,{error:'already_settled'},409);
   try {
-    const result = await saveEncryptedFulfillment(token,data);
+    const escrow = await azureEscrowFromEnvironment();
+    const result = await escrow.save(token,data);
     return json(context.res,{ok:true,created:result.created},200);
   } catch(error) {
     if(error.message==='encrypted_payload_conflict') return json(context.res,{error:'conflict'},409);
