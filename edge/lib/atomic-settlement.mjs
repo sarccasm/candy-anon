@@ -25,8 +25,9 @@ export async function settleInvoiceAtomically(store, token, observation) {
     try { stock=await store.client.getEntity('invoices','stock:'+sku); }
     catch(e){if(e.statusCode===404)throw Error('inventory_not_provisioned');throw e;}
     if(!Number.isSafeInteger(stock.quantity)||stock.quantity<qty)throw Error('out_of_stock');
-    actions.push(['update',{partitionKey:'invoices',rowKey:'stock:'+sku,quantity:stock.quantity-qty},
-      'Replace',{etag:stock.etag}]);
+    const {etag: _etag, timestamp: _timestamp, ...stockFields}=stock;
+    actions.push(['update',{...stockFields,partitionKey:'invoices',rowKey:'stock:'+sku,
+      quantity:stock.quantity-qty},'Replace',{etag:stock.etag}]);
   }
   const clean={...invoice,committed:true,committedAt:new Date().toISOString(),
     settledSats:observation.eligibleSats};
