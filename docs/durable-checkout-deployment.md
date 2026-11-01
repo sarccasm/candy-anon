@@ -21,3 +21,9 @@
 - No scheduled TTL cleanup worker or verified carrier acknowledgements have been deployed. Do not enable destructive cleanup until durable receipt and reconciliation are recorded.
 - Existing admin product changes remain local-file-backed and will not update authoritative Azure stock until the admin write path is migrated.
 - No production traffic migration or deployment has been performed. Keep PR Draft until integration tests and operational review pass.
+
+## Scheduled retention timer (added)
+`edge/EscrowCleanup` runs hourly and scans up to `ESCROW_PURGE_BATCH_SIZE` blobs per run (default 50). By default it is DRY RUN. Set `ENABLE_ESCROW_PURGE=true` **only after** durable backend-only carrier acknowledgements, `paymentStatus`, `blockchainReconciled`, `settlementJournalPersisted`, and `purgeAfter` are written by authenticated workers and fully tested. There is no client endpoint for asserting these booleans. Blob soft-delete/versioning/backups may retain encrypted bytes beyond an application delete.
+
+### Still not a deployed, end-to-end checkout
+All code remains on a Draft PR, with no confirmed provisioned Azure resources or production secrets. No live payment/regtest or real delivery-carrier integrations were executed. Migrate admin inventory writes before enabling checkout.
