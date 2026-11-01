@@ -31,3 +31,11 @@ test('provider page does not claim completeness or payment', async()=>{
   assert.equal(page.completeHistory,false);
   assert.throws(()=>check(page.transactions,{completeHistory:page.completeHistory}),/unverifiable/);
 });
+
+test('rejects excessive confirmation policy',()=>{
+  assert.throws(()=>check([],{requiredConfirmations:101}),/unverifiable_payment_history/);
+});
+test('rejects running BTC amount overflow',()=>{
+  const huge=Number.MAX_SAFE_INTEGER;
+  assert.throws(()=>check([tx('a',huge,true),tx('b',1,true)]),/amount_overflow/);
+});
