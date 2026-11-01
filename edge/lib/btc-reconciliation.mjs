@@ -3,7 +3,7 @@ export function inspectBitcoinPayments({ address, expectedSats, transactions, ti
   if (typeof address !== 'string' || !/^[a-zA-Z0-9]{14,90}$/.test(address) ||
       !Number.isSafeInteger(expectedSats) || expectedSats <= 0 ||
       !Number.isSafeInteger(tipHeight) || tipHeight < 0 ||
-      !Number.isSafeInteger(requiredConfirmations) || requiredConfirmations < 1 ||
+      !Number.isSafeInteger(requiredConfirmations) || requiredConfirmations < 1 || requiredConfirmations > 100 ||
       !Array.isArray(transactions) || !completeHistory) throw new Error('unverifiable_payment_history');
   const seen = new Set();
   let confirmed = 0, unconfirmed = 0, eligible = 0, minConfs = Infinity;
@@ -22,10 +22,12 @@ export function inspectBitcoinPayments({ address, expectedSats, transactions, ti
       if (!Number.isSafeInteger(height) || height <= 0 || height > tipHeight) throw new Error('invalid_block_height');
       const confirmations = tipHeight - height + 1;
       confirmed += sats;
+      if (!Number.isSafeInteger(confirmed)) throw new Error('amount_overflow');
       if (confirmations >= requiredConfirmations) eligible += sats;
       if (sats > 0) minConfs = Math.min(minConfs, confirmations);
     } else if (tx.status?.confirmed === false) {
       unconfirmed += sats;
+      if (!Number.isSafeInteger(unconfirmed)) throw new Error('amount_overflow');
     } else throw new Error('invalid_transaction_status');
   }
   if (![confirmed, unconfirmed, eligible].every(Number.isSafeInteger)) throw new Error('amount_overflow');
