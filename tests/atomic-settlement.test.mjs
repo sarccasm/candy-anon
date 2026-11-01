@@ -114,3 +114,11 @@ test('parallel settlements cannot deduct stock twice',async()=>{
   assert.equal(result.every(x=>x.ok),true);
   assert.equal((await client.getEntity('invoices','stock:c1')).quantity,3);
 });
+
+test('replay cannot return success after verified BTC amount drops below invoice',async()=>{
+  const {store,client}=await setup();
+  await settleInvoiceAtomically(store,token,paid);
+  await assert.rejects(()=>settleInvoiceAtomically(store,token,
+    {status:'PAID',eligibleSats:100}),/invalid_committed_invoice/);
+  assert.equal((await client.getEntity('invoices','stock:c1')).quantity,3);
+});
