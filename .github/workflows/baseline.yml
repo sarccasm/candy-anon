@@ -11,7 +11,7 @@ jobs:
         with:
           node-version: '22'
       - name: Test isolated order state rules
-        run: node --test tests/order-state-isolated.test.mjs
+        run: node --test tests/order-state-isolated.test.mjs tests/btc-reconciliation-isolated.test.mjs
       - name: Check application JavaScript syntax
         run: |
           find edge frontend -type f \( -name '*.js' -o -name '*.mjs' \) ! -path '*/node_modules/*' -print0 | xargs -0 -n1 node --check
