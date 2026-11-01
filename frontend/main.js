@@ -29,6 +29,8 @@ let cart = [];
 let pollTimer = null;
 let countdownTimer = null;
 let countdownLeftMs = 0;
+let pollInFlight = false;
+let submittingShipment = false;
 let encryptedPII = null;
 let payToken = "";
 let payAmountSats = 0;
@@ -196,9 +198,12 @@ async function startPayment(){
     const token=String(d.token||"");
     payAmountSats=Number(d.amountSats);
     if(!/^[a-zA-Z0-9]{14,90}$/.test(addr)||!/^[0-9a-f-]{36}$/i.test(token)||!Number.isSafeInteger(payAmountSats)||payAmountSats<=0)throw new Error("invalid_invoice");
-    payToken=token;setPayUi({address:addr,token,amountSats:payAmountSats});startCountdown(20*60*1000);startPolling();showInlineError("");await fetchStock();filterAndSort();
+    payToken=token;
+    ["fldName","fldAddr","fldPhone"].forEach(id=>{const field=$("#"+id);if(field)field.value="";});
+    setPayUi({address:addr,token,amountSats:payAmountSats});startCountdown(20*60*1000);startPolling();showInlineError("");await fetchStock();filterAndSort();
   }catch(e){
     const map={pubkey_fetch_failed:"Не вдалося завантажити відкритий ключ.",invalid_public_key:"Невірний або непридатний ключ шифрування.",invalid_invoice:"Сервер повернув некоректний рахунок."};
+    encryptedPII=null;
     showInlineError(map[e?.message]||"Помилка під час шифрування/створення платежу");
     showDialog(map[e?.message]||"Помилка під час шифрування PGP.");
   }finally{
@@ -212,22 +217,28 @@ function startCountdown(ms){
 }
 
 async function afterPaid(){
+  if(submittingShipment||!encryptedPII||!payToken)return;
+  submittingShipment=true;
   const url=`${CONFIG.API_BASE}/create-shipment`;
   try{
     const res=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:payToken,data:encryptedPII})});
-    if(res.ok||res.status===409){encryptedPII=null;payToken="";["fldName","fldAddr","fldPhone"].forEach(id=>{const f=$("#"+id);if(f)f.value="";});$("#result")?.classList.remove("hidden");if($("#result"))$("#result").textContent="Order placed. Thank you!";cart=[];saveCart();renderDrawerList();renderCheckoutCart();}
-    else{showInlineError("Не вдалося створити відправлення");}
-  }catch{showInlineError("Не вдалося створити відправлення");}
+    if(res.ok){encryptedPII=null;payToken="";["fldName","fldAddr","fldPhone"].forEach(id=>{const f=$("#"+id);if(f)f.value="";});$("#result")?.classList.remove("hidden");if($("#result"))$("#result").textContent="Order placed. Thank you!";cart=[];saveCart();renderDrawerList();renderCheckoutCart();}
+    else if(res.status===409){showInlineError("Відправлення вже існує. Перевірте замовлення через підтримку.");}
+    else{showInlineError("Не вдалося створити відправлення. Повторіть спробу.");}
+  }catch{showInlineError("Не вдалося створити відправлення. Повторіть спробу.");}
+  finally{submittingShipment=false;}
 }
 
 function stopPolling(){clearInterval(pollTimer);pollTimer=null;}
 async function pollOnce(){
-  if(!payToken||!payAmountSats)return;
+  if(!payToken||!payAmountSats||pollInFlight)return;
+  pollInFlight=true;
   const url=`${CONFIG.API_BASE}/pay/status?token=${encodeURIComponent(payToken)}`;
   let paid=false;let unavailable=false;
   try{const res=await fetch(url,{cache:"no-store"});if(res.ok){const j=await res.json();paid=j.paid===true;}else unavailable=true;}catch{unavailable=true;}
   const st=$("#payStatus");
   if(paid){stopPolling();clearInterval(countdownTimer);if(st)st.textContent="Paid";await afterPaid();}else{if(st)st.textContent=unavailable?"Payment status unavailable. Retrying…":"Not paid yet";}
+  pollInFlight=false;
 }
 function startPolling(){stopPolling();pollTimer=setInterval(pollOnce,10000);pollOnce();}
 
