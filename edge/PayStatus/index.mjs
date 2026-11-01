@@ -6,6 +6,7 @@ import { invoiceStoreFromEnvironment } from '../lib/azure-invoices.mjs';
 import { azureEscrowFromEnvironment } from '../lib/azure-encrypted-escrow.mjs';
 import { settleInvoiceAtomically } from '../lib/atomic-settlement.mjs';
 import { observeBitcoinInvoice } from '../lib/esplora-watcher.mjs';
+import { paymentStatusForClient } from '../lib/payment-status-response.mjs';
 
 // Payment verification and durable settlement. Missing inventory or escrow fails closed.
 const providers = [process.env.BLOCKSTREAM_API || 'https://blockstream.info/api',
@@ -40,9 +41,8 @@ export default async function (context, req) {
   }
   if(!observation)return json(context.res,{paid:false,error:'verification_unavailable'},503);
   if(observation.status!=='PAID') {
-    if(invoice.committed===true)
-      return json(context.res,{paid:false,status:'REORG_REVIEW',error:'manual_review_required'},409);
-    return json(context.res,{paid:false,status:observation.status,confs:observation.confirmations},200);
+    const response=paymentStatusForClient(invoice,observation);
+    return json(context.res,response.body,response.code);
   }
   const issuedAt=Date.parse(invoice.createdAt);
   if(!Number.isFinite(issuedAt))return json(context.res,{paid:false,error:'invalid_invoice_timestamp'},503);
