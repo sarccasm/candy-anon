@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {TableClient} from '@azure/data-tables';
+import {createRequire} from 'node:module';
+const require=createRequire(new URL('../edge/package.json',import.meta.url));
+const {TableClient}=require('@azure/data-tables');
 import {AzureInvoiceStore} from '../edge/lib/azure-invoices.mjs';
 import {settleInvoiceAtomically} from '../edge/lib/atomic-settlement.mjs';
 
