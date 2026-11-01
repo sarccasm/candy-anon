@@ -13,5 +13,11 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           find edge frontend -type f \( -name '*.js' -o -name '*.mjs' \) ! -path '*/node_modules/*' -print0 | xargs -0 -n1 node --check
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+      - name: Build frontend
+        run: npm run build --prefix frontend
+      - name: Test browser PGP integration
+        run: node --test frontend/tests/*.test.mjs
       - name: Run security unit tests
         run: node --test tests/*.test.mjs
