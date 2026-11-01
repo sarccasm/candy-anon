@@ -11,6 +11,8 @@
     "bs58check": "^4.0.0",
     "dotenv": "^16.4.5",
     "openpgp": "^5.11.1",
-    "tiny-secp256k1": "^2.2.4"
+    "tiny-secp256k1": "^2.2.4",
+    "@azure/storage-blob": "^12.26.0",
+    "@azure/data-tables": "^13.3.0"
   }
 }

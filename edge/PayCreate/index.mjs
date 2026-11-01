@@ -3,7 +3,7 @@ loadEnv();
 
 import crypto from 'node:crypto';
 import { json, options } from '../lib/http.mjs';
-import { writeJson, paths } from '../lib/store.mjs';
+import { invoiceStoreFromEnvironment } from '../lib/azure-invoices.mjs';
 import { hmacIndex, deriveAddress } from '../lib/derive-btc.mjs';
 import { getProducts } from '../lib/db.mjs';
 
@@ -60,8 +60,13 @@ export default async function (context, req) {
       );
     }
 
-    for (const [sku,qty] of entries) {
-      if (catalog.get(sku).stock < qty) return json(context.res,{error:'out_of_stock',sku},409);
+    const inventoryStore=await invoiceStoreFromEnvironment();
+    for(const [sku,qty] of entries){
+      let current;
+      try { current=await inventoryStore.client.getEntity('invoices','stock:'+sku); }
+      catch { return json(context.res,{error:'inventory_unavailable'},503); }
+      if(!Number.isSafeInteger(current.quantity)||current.quantity<qty)
+        return json(context.res,{error:'out_of_stock',sku},409);
     }
 
     const token = crypto.randomUUID();
@@ -85,7 +90,7 @@ export default async function (context, req) {
       createdAt: new Date().toISOString()
     };
 
-    await writeJson(paths.paymentFile(token), invoice);
+    await (await invoiceStoreFromEnvironment()).create(invoice);
 
     return json(context.res, {
       token, address, amountSats: Number(amountSats), source: 'xpub'
