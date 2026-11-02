@@ -8,6 +8,7 @@ import { settleInvoiceAtomically } from '../lib/atomic-settlement.mjs';
 import { observeBitcoinInvoice } from '../lib/esplora-watcher.mjs';
 import { paymentStatusForClient } from '../lib/payment-status-response.mjs';
 import { verifyIndependentPayment } from '../lib/independent-payment-check.mjs';
+import { committedInvoiceIntegrity } from '../lib/committed-invoice-integrity.mjs';
 
 // Payment verification and durable settlement. Missing inventory or escrow fails closed.
 const providers = [process.env.BLOCKSTREAM_API || 'https://blockstream.info/api',
@@ -25,6 +26,8 @@ export default async function (context, req) {
   if(!invoice)return json(context.res,{error:'not_found'},404);
   if(typeof invoice.address!=='string'||!Number.isSafeInteger(invoice.amountSats)||invoice.amountSats<=0)
     return json(context.res,{error:'bad_invoice'},500);
+  if(!committedInvoiceIntegrity(invoice))
+    return json(context.res,{paid:false,status:'INVOICE_REVIEW',error:'manual_review_required'},409);
   const required=Number(process.env.MIN_CONFIRMATIONS || 2);
   if(!Number.isSafeInteger(required)||required<1||required>100)
     return json(context.res,{error:'invalid_confirmation_config'},500);
