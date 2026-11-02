@@ -1,0 +1,22 @@
+name: Bitcoin Core Regtest
+on:
+  push:
+  pull_request:
+jobs:
+  regtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Start isolated Bitcoin Core regtest
+        run: |
+          docker run -d --name bitcoin-regtest bitcoin/bitcoin:29.5 \
+            -regtest=1 -server=1 -txindex=1 -fallbackfee=0.0001 -printtoconsole
+      - name: Exercise confirmations and block invalidation
+        run: bash scripts/bitcoin-regtest-smoke.sh
+      - name: Bitcoin logs on failure
+        if: failure()
+        run: docker logs bitcoin-regtest --tail 80
