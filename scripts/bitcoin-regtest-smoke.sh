@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Dedicated regtest chain, with no production funds or credentials.
-cli() { docker exec bitcoin-regtest bitcoin-cli -regtest "$@"; }
+cli() { docker exec bitcoin-regtest bitcoin-cli -regtest -rpcuser=regtest -rpcpassword=ci-only-regtest-password "$@"; }
 for attempt in $(seq 1 60); do
   if cli getblockcount >/dev/null 2>&1; then break; fi
   sleep 2
