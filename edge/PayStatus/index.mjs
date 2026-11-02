@@ -25,6 +25,9 @@ export default async function (context, req) {
   if(!invoice)return json(context.res,{error:'not_found'},404);
   if(typeof invoice.address!=='string'||!Number.isSafeInteger(invoice.amountSats)||invoice.amountSats<=0)
     return json(context.res,{error:'bad_invoice'},500);
+  if(invoice.committed===true && (!Number.isSafeInteger(invoice.settledSats) ||
+      invoice.settledSats<invoice.amountSats))
+    return json(context.res,{paid:false,status:'INVOICE_REVIEW',error:'manual_review_required'},409);
   const required=Number(process.env.MIN_CONFIRMATIONS || 2);
   if(!Number.isSafeInteger(required)||required<1||required>100)
     return json(context.res,{error:'invalid_confirmation_config'},500);
