@@ -27,7 +27,7 @@ test('CAS allows nonfinancial status metadata',async()=>{
 test('CAS rejects tampering with immutable invoice fields',async()=>{
  for(const patch of [{createdAt:'2020-01-01T00:00:00Z'},
   {items:{c1:1}},{committed:true},{settledSats:50000},{address:'bc1differentaddress1234567890'},
-  {amountSats:1}]){
+  {amountSats:1},{addressAllocationVersion:1},{addressIndex:0},{addressBranch:1}]){
   const store=await fixture(),row=await store.read(token);
   await assert.rejects(()=>store.compareAndSwap(token,row._etag,old=>({...old,...patch})),/invalid_update/);
   const unchanged=await store.read(token);

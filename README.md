@@ -1,5 +1,20 @@
 # candy-anon
 
+> Поточний код використовує Azure Table для каталогу, рахунків і атомарного списання
+> залишків та приватний Azure Blob для зашифрованих даних доставки. Фоновий таймер
+> перевіряє оплату й зберігає завдання на відправлення без відкритої вкладки.
+> Реальної інтеграції перевізника ще немає. Початкові інструкції нижче частково
+> застаріли; актуальні налаштування й обмеження описані тут:
+>
+> - [Локальне середовище та наскрізний тест](docs/local-staging.md)
+> - [Каталог і міграція](docs/durable-catalog.md)
+> - [BTC-адреси й міграція старих рахунків](docs/bitcoin-address-allocation.md)
+> - [Фонова обробка та завдання на відправлення](docs/background-payments.md)
+> - [Замовлення та проблемні оплати в адмінці](docs/admin-orders.md)
+> - [Резерви, ручне передавання та керування оплатами](docs/order-operations.md)
+> - [Звірка старих рахунків, секрети й хмарний захист](docs/cloud-readiness.md)
+> - [Єдина міграція даних і локальна перевірка](docs/dataset-migration.md)
+
 Minimal skeleton for a no-DB, privacy-first candy store:
 - Origin in Ireland (Azure North Europe) + Cloudflare CDN
 - Client-side PGP encryption of shipping data

@@ -8,9 +8,27 @@ import {AzureInvoiceStore} from '../edge/lib/azure-invoices.mjs';
 import {settleInvoiceAtomically} from '../edge/lib/atomic-settlement.mjs';
 
 const connection=process.env.AZURITE_TABLE_CONNECTION_STRING;
+test('real Azure address claims and concurrent allocations prevent invoice reuse', {skip:!connection}, async()=>{
+ const table='T'+randomUUID().replaceAll('-','').slice(0,22);
+ const client=TableClient.fromConnectionString(connection,table,{allowInsecureConnection:true});
+ await client.createTable();
+ try {
+  const store=new AzureInvoiceStore(client);
+  const indices=await Promise.all(Array.from({length:4},()=>store.allocateBitcoinIndex()));
+  assert.equal(new Set(indices).size,4);
+  const invoice={token:randomUUID(),address:'bc1integration',amountSats:50000,addressAllocationVersion:1};
+  await store.createWithUniqueAddress(invoice);
+  const duplicate={...invoice,token:randomUUID()};
+  await assert.rejects(()=>store.createWithUniqueAddress(duplicate));
+  assert.equal(await store.read(duplicate.token),null);
+  const other={...invoice,address:'bc1anotherintegration'};
+  await assert.rejects(()=>store.createWithUniqueAddress(other));
+  await store.createWithUniqueAddress({...other,token:randomUUID()});
+ } finally { await client.deleteTable(); }
+});
 test('real Azure Table SDK transactions are atomic and idempotent', {skip:!connection},async()=>{
  const table='T'+randomUUID().replaceAll('-','').slice(0,22);
- const client=TableClient.fromConnectionString(connection,table);
+ const client=TableClient.fromConnectionString(connection,table,{allowInsecureConnection:true});
  await client.createTable();
  try{
   const store=new AzureInvoiceStore(client);
@@ -30,7 +48,7 @@ test('real Azure Table SDK transactions are atomic and idempotent', {skip:!conne
 
 test('Azure Table rejects stale ETag batch without partially changing stock', {skip:!connection},async()=>{
  const table='T'+randomUUID().replaceAll('-','').slice(0,22);
- const client=TableClient.fromConnectionString(connection,table);
+ const client=TableClient.fromConnectionString(connection,table,{allowInsecureConnection:true});
  await client.createTable();
  try {
   const store=new AzureInvoiceStore(client);

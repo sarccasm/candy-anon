@@ -18,7 +18,7 @@ jobs:
       - name: Build frontend
         run: npm run build --prefix frontend
       - name: Install Azure SDK integration dependencies
-        run: npm install --prefix edge --no-package-lock --ignore-scripts
+        run: npm ci --prefix edge --ignore-scripts
       - name: Start Azurite Table emulator
         run: |
           docker run -d --name azurite-table -p 10002:10002 mcr.microsoft.com/azure-storage/azurite:3.35.0 azurite-table --tableHost 0.0.0.0 --tablePort 10002

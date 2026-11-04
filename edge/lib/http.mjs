@@ -11,13 +11,13 @@ export const CORS_HEADERS = {
 
 function apply(res, status = 200, body = '', headers = {}) {
   res.status = status;
-  res.headers = { ...CORS_HEADERS, ...headers };
+  res.headers = { ...CORS_HEADERS, 'Cache-Control':'no-store', ...headers };
   res.body = body;
   return res;
 }
 
-export function options(res) { return apply(res, 204, ''); }
-export function json(res, obj, status = 200, extra = {}) { return apply(res, status, JSON.stringify(obj), { 'content-type': 'application/json', ...extra }); }
+export function options(res, {origin} = {}) { return apply(res, 204, '', origin ? {'Access-Control-Allow-Origin':origin} : {}); }
+export function json(res, obj, status = 200, {origin, ...extra} = {}) { return apply(res, status, JSON.stringify(obj), { 'content-type': 'application/json', ...(origin ? {'Access-Control-Allow-Origin':origin} : {}), ...extra }); }
 export function text(res, str, status = 200, extra = {}) { return apply(res, status, String(str), { 'content-type': 'text/plain; charset=utf-8', ...extra }); }
 
 export const ok = (res) => json(res, { ok: true }, 200);

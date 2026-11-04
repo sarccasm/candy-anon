@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 300"><defs><pattern id="dots" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".8" fill="#171913" opacity=".18"/></pattern></defs>
+<circle cx="181" cy="147" r="118" fill="#e0c4ff" opacity=".3"/><path d="M38 127Q66 84 114 61Q143 37 179 62Q211 36 246 63Q292 84 324 127Q304 221 246 257Q181 293 116 257Q55 219 38 127Z" fill="#e0c4ff" stroke="#e0c4ff" stroke-width="18" stroke-linejoin="round"/>
+<path d="M38 127Q66 84 114 61Q143 37 179 62Q211 36 246 63Q292 84 324 127Q304 221 246 257Q181 293 116 257Q55 219 38 127Z" fill="#663957" stroke="#202019" stroke-width="5"/>
+<path d="M58 128Q106 101 136 100Q180 116 225 100Q265 104 304 129Q278 200 240 220Q178 251 117 218Q78 187 58 128Z" fill="#202019" stroke="#202019" stroke-width="5"/>
+<path d="M100 111L105 134Q126 145 143 138L145 111M149 112L149 139Q171 151 190 139L190 115M195 114L195 139Q215 145 231 133L234 111M238 113L238 132L261 123L258 115" fill="#fff4db" stroke="#202019" stroke-width="3" stroke-linejoin="round"/>
+<path d="M95 168Q102 128 146 148Q180 161 211 147Q256 129 270 168L258 224Q242 272 184 276Q125 274 107 232Z" fill="#bd8da9" stroke="#202019" stroke-width="4"/>
+<path d="M112 170Q135 155 163 168Q181 177 198 168Q234 151 251 174Q258 201 231 214Q198 224 181 213Q145 224 119 205Q105 189 112 170Z" fill="#fff" opacity=".18"/>
+<path d="M180 169L183 218M63 123Q115 90 144 89M219 89Q264 96 298 123" fill="none" stroke="#202019" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+<path d="M45 125Q90 81 119 67Q147 51 177 76Q211 48 242 68Q286 91 314 125L304 132Q261 106 234 103Q209 111 182 112Q148 111 128 102Q87 106 55 136Z" fill="url(#dots)"/>
+<path d="M113 235Q139 272 184 272Q231 270 251 231L250 245Q224 282 182 278Q139 278 115 248Z" fill="url(#dots)"/>
+<g transform="translate(182 228) rotate(-13)"><circle r="26" fill="#e0c4ff" stroke="#202019" stroke-width="3"/><circle r="20" fill="none" stroke="#202019" stroke-width="1" opacity=".35"/><text text-anchor="middle" y="11" font-family="Arial,sans-serif" font-weight="700" font-size="35" fill="#202019">○</text><ellipse cx="-9" cy="-13" rx="7" ry="3" fill="#fff" opacity=".6"/></g>
+<path d="M42 60V82M31 71H53M308 231V247M300 239H316" stroke="#202019" stroke-width="2"/><circle cx="302" cy="57" r="5" fill="none" stroke="#202019" stroke-width="2"/></svg>

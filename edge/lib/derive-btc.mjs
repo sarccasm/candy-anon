@@ -6,7 +6,9 @@ import crypto from 'node:crypto';
 import { Buffer } from 'node:buffer';
 
 const bip32 = BIP32Factory(ecc);
-const NET = process.env.NETWORK === 'testnet' ? bitcoin.networks.testnet : bitcoin.networks.bitcoin;
+const NETWORKS = {mainnet:bitcoin.networks.bitcoin,testnet:bitcoin.networks.testnet,regtest:bitcoin.networks.regtest};
+const NET = NETWORKS[process.env.NETWORK || 'mainnet'];
+if (!NET) throw Error('invalid_bitcoin_network');
 
 const VERS = {
   mainnet: { xpub: 0x0488b21e, ypub: 0x049d7cb2, zpub: 0x04b24746 },
@@ -28,9 +30,11 @@ function versionOf(xkey) {
 }
 
 function toNeutralXpub(xkey) {
-  const isTestnet = NET === bitcoin.networks.testnet;
+  const isTestnet = NET !== bitcoin.networks.bitcoin;
   const target = isTestnet ? VERS.testnet.tpub : VERS.mainnet.xpub;
   const buf = decode58(xkey);
+  const allowed = Object.values(isTestnet ? VERS.testnet : VERS.mainnet);
+  if (!allowed.includes(buf.readUInt32BE(0))) throw new Error('xpub_network_mismatch');
   buf.writeUInt32BE(target, 0);
   return bs58check.encode(buf);
 }
@@ -48,9 +52,11 @@ export function hmacIndex(secret, token) {
   return (mac.readUInt32BE(0) & 0x7fffffff) % mod;
 }
 
-export function deriveAddress(xkey, index) {
+export function deriveAddress(xkey, index, branch = 0) {
+  if (!Number.isSafeInteger(index) || index < 0 || index >= 0x80000000 ||
+      ![0, 1].includes(branch)) throw new Error('invalid_derivation_path');
   const neutral = toNeutralXpub(xkey);
-  const node = bip32.fromBase58(neutral, NET).derive(0).derive(index);
+  const node = bip32.fromBase58(neutral, NET).derive(branch).derive(index);
   const type = scriptTypeOf(xkey);
   const pubkey = Buffer.isBuffer(node.publicKey) ? node.publicKey : Buffer.from(node.publicKey);
 

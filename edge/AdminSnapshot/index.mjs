@@ -1,6 +1,10 @@
+import {authorizeLocalRequest} from '../lib/local-request-auth.mjs';
+import {invoiceStoreFromEnvironment} from '../lib/azure-invoices.mjs';
+import {readCheckoutPolicy,policySummary} from '../lib/checkout-policy.mjs';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { catalogFromEnvironment } from '../lib/catalog.mjs';
 import { readState } from '../lib/store.mjs';
 import { okAuth, json, options } from '../lib/http.mjs';
 
@@ -22,12 +26,16 @@ async function readTailJsonl(p) {
 }
 
 export default async function (context, req) {
-  if (req.method === 'OPTIONS') return options(context.res);
+  context.res ??= {};
+  if(!authorizeLocalRequest(context,req))return;
+  if (req.method === 'OPTIONS') return options(context.res, {origin:ORIGIN});
 
   try {
     if (!okAuth(req)) return json(context.res, { error: 'unauthorized' }, 401, { origin: ORIGIN });
 
     const st = await readState();
+    const checkout=policySummary(await readCheckoutPolicy((await invoiceStoreFromEnvironment()).client));
+    const catalog = await (await catalogFromEnvironment()).read();
 
     const hours = Math.max(1, Math.min(72, Number(req.query?.hours || 24)));
     const now = Date.now();
@@ -90,7 +98,8 @@ export default async function (context, req) {
 
     return json(context.res, {
       user: st.user || 'M1000',
-      products: st.products || [],
+      products: catalog.products,
+      catalogVersion: catalog.version,
       analytics: {
         window_h: hours,
         users,
@@ -103,11 +112,12 @@ export default async function (context, req) {
         server_ip: process.env.SERVER_IP || st.hosting?.server_ip || '',
         domain:    process.env.PUBLIC_DOMAIN || st.hosting?.domain || ''
       },
-      access: st.access || { published: false, note: 'Draft' }
+      checkout,
+      access: {published:checkout.enabled,note:checkout.enabled?'Checkout enabled':'Checkout stopped'}
     }, 200, { origin: ORIGIN });
 
   } catch (e) {
-    context.log?.error?.(e);
+    context.log?.error?.('snapshot_failed');
     return json(context.res, { error: 'snapshot_failed' }, 500, { origin: ORIGIN });
   }
 }

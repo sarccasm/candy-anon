@@ -6,7 +6,7 @@ const HASH = TXID;
 const ADDRESS = /^[a-zA-Z0-9]{14,90}$/;
 
 export async function fetchCompleteEsploraHistory({
-  address, baseUrl, fetchImpl = fetch, maxPages = 40, timeoutMs = 8000
+  address, baseUrl, fetchImpl = fetch, maxPages = 40, timeoutMs = 8000, signal
 }) {
   if (!ADDRESS.test(address || '') || typeof baseUrl !== 'string' || !/^https:\/\//.test(baseUrl))
     throw new Error('invalid_source');
@@ -18,7 +18,7 @@ export async function fetchCompleteEsploraHistory({
     const ctrl = new AbortController();
     const timeout = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const res = await fetchImpl(`${root}${route}`, {signal:ctrl.signal});
+      const res = await fetchImpl(`${root}${route}`, {signal:signal?AbortSignal.any([signal,ctrl.signal]):ctrl.signal});
       if (!res.ok) throw new Error('provider_unavailable');
       return await res.json().catch(() => { throw new Error('invalid_response'); });
     } finally { clearTimeout(timeout); }
@@ -27,7 +27,7 @@ export async function fetchCompleteEsploraHistory({
     const ctrl=new AbortController();
     const timeout=setTimeout(()=>ctrl.abort(),timeoutMs);
     try {
-      const response=await fetchImpl(`${root}/blocks/tip/hash`,{signal:ctrl.signal});
+      const response=await fetchImpl(`${root}/blocks/tip/hash`,{signal:signal?AbortSignal.any([signal,ctrl.signal]):ctrl.signal});
       if(!response.ok)throw new Error('provider_unavailable');
       return (await response.text()).trim();
     } finally {clearTimeout(timeout);}
@@ -67,17 +67,23 @@ export async function fetchCompleteEsploraHistory({
 }
 
 export async function observeBitcoinInvoice({ address, expectedSats, requiredConfirmations = 2,
-  expired = false, baseUrl, fetchImpl = fetch, maxPages = 40 }) {
+  expired = false, baseUrl, fetchImpl = fetch, maxPages = 40, timeoutMs = 8000, signal }) {
   // Check tip HEIGHT under the same no-reorg window used to fetch transaction history.
   // This is observation only. A second verification is required before any settlement.
   const root = baseUrl?.replace(/\/$/, '');
-  const history = await fetchCompleteEsploraHistory({address,baseUrl,fetchImpl,maxPages});
-  const heightResponse = await fetchImpl(`${root}/blocks/tip/height`);
-  if (!heightResponse.ok) throw new Error('provider_unavailable');
-  const height = Number(await heightResponse.text());
+  const history = await fetchCompleteEsploraHistory({address,baseUrl,fetchImpl,maxPages,timeoutMs,signal});
+  async function getText(route) {
+    const ctrl=new AbortController();
+    const timeout=setTimeout(()=>ctrl.abort(),timeoutMs);
+    try {
+      const response=await fetchImpl(`${root}${route}`,{signal:signal?AbortSignal.any([signal,ctrl.signal]):ctrl.signal});
+      if(!response.ok)throw Error('provider_unavailable');
+      return await response.text();
+    } finally {clearTimeout(timeout);}
+  }
+  const height = Number(await getText('/blocks/tip/height'));
   if (!Number.isSafeInteger(height) || height < 0) throw new Error('invalid_tip_height');
-  const hashResponse = await fetchImpl(`${root}/blocks/tip/hash`);
-  if (!hashResponse.ok || (await hashResponse.text()).trim() !== history.tipHash) throw new Error('tip_changed_retry');
+  if ((await getText('/blocks/tip/hash')).trim() !== history.tipHash) throw new Error('tip_changed_retry');
   return inspectBitcoinPayments({address,expectedSats,requiredConfirmations,expired,
     transactions:history.transactions,completeHistory:true,tipHeight:height});
 }

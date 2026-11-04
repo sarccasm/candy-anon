@@ -5,9 +5,18 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": ["post", "options"],
+      "methods": [
+        "post",
+        "options"
+      ],
       "route": "create-shipment"
     },
-    { "type": "http", "direction": "out", "name": "res" }
-  ]
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ],
+  "scriptFile": "index.mjs",
+  "entryPoint": "default"
 }

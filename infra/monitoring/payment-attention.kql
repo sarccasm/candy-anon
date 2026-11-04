@@ -1,0 +1,7 @@
+// Return counts only, not request URLs, invoice tokens, addresses or trace payloads.
+AppTraces
+| where TimeGenerated > ago(5m)
+| where AppRoleName == 'FUNCTION_APP_ROLE_NAME'
+| where Message startswith 'payment_scan_attention'
+| summarize AttentionBatches=count()
+| where AttentionBatches > 0

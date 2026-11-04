@@ -5,7 +5,10 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": ["get", "options"],
+      "methods": [
+        "get",
+        "options"
+      ],
       "route": "products"
     },
     {
@@ -13,5 +16,7 @@
       "direction": "out",
       "name": "res"
     }
-  ]
+  ],
+  "scriptFile": "index.mjs",
+  "entryPoint": "default"
 }

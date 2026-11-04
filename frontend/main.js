@@ -15,23 +15,14 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const LS_CART_KEY = "mc_cart";
 const SESSION_INVOICE_KEY = "mc_pending_invoice";
 
-const CANDIES = [
-  { id: "c1", name: "Caramel Swirl", priceUsd: 3.5, tag: "light", color: "bglight" },
-  { id: "c2", name: "Mint Blizz",    priceUsd: 2.9, tag: "mint",  color: "bgmint"  },
-  { id: "c3", name: "Dark Bite",     priceUsd: 4.2, tag: "dark",  color: "bgchoc"  },
-  { id: "c4", name: "Berry Pop",     priceUsd: 3.1, tag: "fruit", color: "bgpink"  },
-  { id: "c5", name: "Zesty Lemon",   priceUsd: 2.7, tag: "fruit", color: "bgamber" },
-  { id: "c6", name: "Nutty Crunch",  priceUsd: 4.8, tag: "nuts",  color: "bgamber" },
-  { id: "c7", name: "Velvet Cocoa",  priceUsd: 5.2, tag: "dark",  color: "bgchoc"  },
-  { id: "c8", name: "Honey Drop",    priceUsd: 2.5, tag: "light", color: "bglight" }
-];
+let CANDIES = [];
+const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
 let cart = [];
 let pollTimer = null;
 let countdownTimer = null;
 let countdownLeftMs = 0;
 let pollInFlight = false;
-let submittingShipment = false;
 let encryptedPII = null;
 let payToken = "";
 let payAmountSats = 0;
@@ -55,41 +46,48 @@ function renderCartCount(){const c=cart.reduce((n,i)=>n+Number(i.qty),0);const e
 function cartTotalUsd(){return cart.reduce((s,i)=>s+Number(i.priceUsd)*Number(i.qty),0);}
 
 function setStage(id){["hero","catalog","checkout"].forEach(sec=>{const el=$("#"+sec);if(!el)return;sec===id?el.classList.remove("hidden"):el.classList.add("hidden");});}
-function animateTitle(){const t=$("#title");if(!t)return;const s="MYCANDY";t.innerHTML="";for(let i=0;i<s.length;i++){const span=document.createElement("span");span.textContent=s[i];span.style.display="inline-block";span.style.transform="translateY(-120px) rotate(-5deg)";span.style.opacity="0";span.style.animation="drop .9s forwards";span.style.animationDelay=`${i*60}ms`;t.appendChild(span);}}
+
 
 async function fetchStock(){
   try{
-    const r=await fetch("/api/products");
-    if(!r.ok){STOCK=new Map();return;}
-    const {products=[]}=await r.json();
+    const r=await fetch("/api/products",{cache:"no-store"});
+    if(!r.ok)throw Error("catalog_unavailable");
+    const {products}=await r.json();
+    if(!Array.isArray(products))throw Error("invalid_catalog");
+    CANDIES=products.map(p=>({id:p.id,name:p.name,priceUsd:p.price,tag:(p.tags||[]).join(", "),
+      color:["bglight","bgmint","bgchoc","bgpink","bgamber"].includes(p.color)?p.color:"bglight"}));
     STOCK=new Map(products.map(p=>[p.id,Number(p.stock||0)]));
-  }catch{STOCK=new Map();}
+    return true;
+  }catch{CANDIES=[];STOCK=new Map();return false;}
 }
 function inCartQty(id){return (Array.isArray(cart)?cart:[]).reduce((s,it)=>s+(it.id===id?Number(it.qty||0):0),0);}
 
 function renderGrid(list){
   const grid=$("#grid");if(!grid)return;grid.innerHTML="";
+  if(!list.length)grid.innerHTML='<p class="empty-state">No matches. Try another search or refresh the page.</p>';
   list.forEach(item=>{
     const left=STOCK.has(item.id)?STOCK.get(item.id):0;
     const already=inCartQty(item.id);
     const canAdd=(left-already)>0;
     const card=document.createElement("div");
     card.className="card";
-    card.innerHTML=`<div class="row-mid" style="gap:12px"><div class="bubble ${item.color}"></div><div><h3>${item.name}</h3><small>${usd(item.priceUsd)}</small><div class="row" style="gap:8px;margin-top:6px"><small class="muted">In stock: ${left}</small></div></div></div><div class="row"><button data-id="${item.id}" class="chip addBtn" ${canAdd?"":"disabled"}>${canAdd?"Add":"Sold out"}</button><small class="muted">${item.tag}</small></div>`;
+    const artId=/^c[1-8]$/.test(item.id)?item.id:null;
+    card.innerHTML=`<div class="product-art ${item.color} ${artId?"pop-art pop-"+artId:""}" aria-hidden="true"><span class="product-index">SAMPLE / ${String(CANDIES.indexOf(item)+1).padStart(2,"0")}</span>${artId?`<img class="candy-illustration" src="/candy/${artId}.svg" alt="" width="360" height="300">`:`<div class="mini-candy"><span>✳</span></div>`}<span class="sample-seal">CA—LAB</span><span class="sample-barcode"></span></div><div class="product-info"><div class="product-stock">${left>0?"● In stock":"○ Out of stock"}</div><h3>${escapeHtml(item.name)}</h3><p class="product-tags">${escapeHtml(item.tag)||"Your next sweet discovery"}</p><div class="product-bottom"><strong>${usd(item.priceUsd)}</strong><button data-id="${escapeHtml(item.id)}" class="chip addBtn" ${canAdd?"":"disabled"} aria-label="Add ${escapeHtml(item.name)} to cart">${canAdd?"Add to cart +":"Unavailable"}</button></div></div>`;
     grid.appendChild(card);
   });
-  $$(".addBtn").forEach(btn=>btn.addEventListener("click",()=>{const id=btn.getAttribute("data-id");const left=STOCK.has(id)?STOCK.get(id):0;const already=inCartQty(id);if(already+1>left){btn.setAttribute("disabled","disabled");btn.textContent="Sold out";return;}addToCart(id);btn.classList.add("pulse");setTimeout(()=>btn.classList.remove("pulse"),300);}));
+  $$(".addBtn").forEach(btn=>btn.addEventListener("click",()=>{const id=btn.getAttribute("data-id");const left=STOCK.has(id)?STOCK.get(id):0;const already=inCartQty(id);if(already+1>left){btn.setAttribute("disabled","disabled");btn.textContent="Unavailable";return;}addToCart(id);btn.classList.add("pulse");setTimeout(()=>btn.classList.remove("pulse"),300);}));
 }
 function filterAndSort(){const q=($("#q")?.value||"").trim().toLowerCase();const sort=$("#sort")?.value||"none";let list=CANDIES.filter(c=>c.name.toLowerCase().includes(q));if(sort==="asc")list.sort((a,b)=>a.priceUsd-b.priceUsd);if(sort==="desc")list.sort((a,b)=>b.priceUsd-a.priceUsd);renderGrid(list);}
 
-function openDrawer(){$("#overlay")?.classList.add("show");$("#drawer")?.classList.add("show");renderDrawerList();}
-function closeDrawer(){$("#overlay")?.classList.remove("show");$("#drawer")?.classList.remove("show");}
+function openDrawer(){$("#drawer")?.setAttribute("aria-hidden","false");$("#overlay")?.classList.add("show");$("#drawer")?.classList.add("show");renderDrawerList();}
+function closeDrawer(){$("#drawer")?.setAttribute("aria-hidden","true");$("#overlay")?.classList.remove("show");$("#drawer")?.classList.remove("show");}
 function renderDrawerList(){
   const list=$("#drawerList");if(!list)return;list.innerHTML="";
+  if(!cart.length)list.innerHTML='<div class="empty-state">Nothing here yet.<br>Add a little sweet attitude.</div>';
   cart.forEach(i=>{
     const el=document.createElement("div");
     el.className="row-mid";el.style.justifyContent="space-between";
-    el.innerHTML=`<div class="row-mid" style="gap:10px"><div class="bubble bglight"></div><div><div>${i.name}</div><small class="muted">${usd(i.priceUsd)}</small></div></div><div class="row-mid" style="gap:8px"><button class="qtybtn qtyBtn" data-id="${i.id}" data-d="-1">-</button><div>${i.qty}</div><button class="qtybtn qtyBtn" data-id="${i.id}" data-d="+1">+</button><button class="qtybtn rmBtn" data-id="${i.id}">×</button></div>`;
+    el.innerHTML=`<div class="row-mid" style="gap:10px"><div class="bubble bglight"></div><div><div>${escapeHtml(i.name)}</div><small class="muted">${usd(i.priceUsd)}</small></div></div><div class="row-mid" style="gap:8px"><button class="qtybtn qtyBtn" data-id="${escapeHtml(i.id)}" data-d="-1">-</button><div>${i.qty}</div><button class="qtybtn qtyBtn" data-id="${escapeHtml(i.id)}" data-d="+1">+</button><button class="qtybtn rmBtn" data-id="${escapeHtml(i.id)}">×</button></div>`;
     list.appendChild(el);
   });
   const drawerTotalEl=$("#drawerTotal")||$("#total");if(drawerTotalEl)drawerTotalEl.textContent=usd(cartTotalUsd());
@@ -118,7 +116,7 @@ function changeQty(id,d){
 
 function renderCheckoutCart(){
   const box=$("#cartList");if(!box)return;box.innerHTML="";
-  cart.forEach(i=>{const row=document.createElement("div");row.className="row-mid";row.style.justifyContent="space-between";row.innerHTML=`<div>${i.name} × ${i.qty}</div><div>${usd(Number(i.priceUsd)*Number(i.qty))}</div>`;box.appendChild(row);});
+  cart.forEach(i=>{const row=document.createElement("div");row.className="row-mid";row.style.justifyContent="space-between";row.innerHTML=`<div>${escapeHtml(i.name)} × ${i.qty}</div><div>${usd(Number(i.priceUsd)*Number(i.qty))}</div>`;box.appendChild(row);});
   const totalEl=$("#total")||$("#checkoutTotal");if(totalEl)totalEl.textContent=usd(cartTotalUsd());
 }
 
@@ -128,8 +126,15 @@ async function createPaymentViaApi(){
   const url=`${CONFIG.API_BASE}/pay/create`;
   
   const lines=cart.map(i=>({sku:i.id,qty:i.qty}));
-  const res=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({lines})});
-  if(!res.ok)throw new Error(String(res.status));
+  const res=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({lines,quotedTotalCents:cart.reduce((sum,i)=>sum+Math.round(i.priceUsd*100)*i.qty,0)})});
+  if(!res.ok){
+    const error=await res.json().catch(()=>({}));
+    if(error.error==="catalog_price_changed"){
+      if(await fetchStock()){normalizeCartSchema();saveCart();renderCheckoutCart();renderDrawerList();filterAndSort();}
+      throw new Error("catalog_price_changed");
+    }
+    throw new Error(error.error || String(res.status));
+  }
   return res.json();
 }
 
@@ -174,9 +179,9 @@ function validateInputs(){
   const address=($("#fldAddr")?.value||"").trim();
   const phone=($("#fldPhone")?.value||"").trim();
   let ok=true;
-  if(name.length<CONFIG.NAME_MIN||name.length>CONFIG.NAME_MAX){setFieldError("fldName",`Вкажіть ім'я (${CONFIG.NAME_MIN}–${CONFIG.NAME_MAX} символів)`);ok=false;}
-  if(address.length<CONFIG.ADDRESS_MIN){setFieldError("fldAddr","Вкажіть адресу доставки");ok=false;}
-  if(phone.length<CONFIG.PHONE_MIN){setFieldError("fldPhone","Вкажіть телефон");ok=false;}
+  if(name.length<CONFIG.NAME_MIN||name.length>CONFIG.NAME_MAX){setFieldError("fldName",`Enter your name (${CONFIG.NAME_MIN}–${CONFIG.NAME_MAX} characters)`);ok=false;}
+  if(address.length<CONFIG.ADDRESS_MIN){setFieldError("fldAddr","Enter a delivery address");ok=false;}
+  if(phone.length<CONFIG.PHONE_MIN){setFieldError("fldPhone","Enter a phone number");ok=false;}
   return { ok, name, address, phone };
 }
 
@@ -187,7 +192,7 @@ async function encryptPII(details) {
 async function startPayment(){
   if(cart.length===0)return;
   const v=validateInputs();
-  if(!v.ok){showInlineError("Заповніть коректно поля форми");return;}
+  if(!v.ok){showInlineError("Please check your delivery details");return;}
   const btn=$("#btnContinuePay");
   const prevText=btn?.textContent;
   try{
@@ -207,10 +212,10 @@ async function startPayment(){
     ["fldName","fldAddr","fldPhone"].forEach(id=>{const field=$("#"+id);if(field)field.value="";});
     setPayUi({address:addr,token,amountSats:payAmountSats});startCountdown(20*60*1000);startPolling();showInlineError("");await fetchStock();filterAndSort();
   }catch(e){
-    const map={pubkey_fetch_failed:"Не вдалося завантажити відкритий ключ.",invalid_public_key:"Невірний або непридатний ключ шифрування.",invalid_invoice:"Сервер повернув некоректний рахунок.",encrypted_escrow_failed:"Не вдалося захищено зберегти дані доставки. Не надсилайте оплату."};
+    const map={below_minimum_btc_amount:"Your cart is below the BTC minimum. Add more items.",checkout_disabled:"New payments are currently paused.",btc_quote_expired:"The BTC quote needs updating. Please try later.",checkout_rate_limited:"Too many invoices. Try again in a minute.",out_of_stock:"An item has been reserved by another customer. Refresh your cart.",checkout_changed_retry:"Stock has changed. Please try checkout again.",catalog_price_changed:"Prices have changed. Check the new total and try checkout again.",pubkey_fetch_failed:"Could not load the public encryption key.",invalid_public_key:"The encryption key is invalid or unusable.",invalid_invoice:"The server returned an invalid invoice.",encrypted_escrow_failed:"Could not securely save delivery details. Do not send payment."};
     encryptedPII=null;
-    showInlineError(map[e?.message]||"Помилка під час шифрування/створення платежу");
-    showDialog(map[e?.message]||"Помилка під час шифрування PGP.");
+    showInlineError(map[e?.message]||"Could not encrypt details or create the payment");
+    showDialog(map[e?.message]||"PGP encryption failed.");
   }finally{
     if(btn){btn.disabled=false;btn.textContent=prevText;}
   }
@@ -221,29 +226,41 @@ function startCountdown(ms){
   countdownTimer=setInterval(()=>{countdownLeftMs-=1000;if(countdownLeftMs<=0){clearInterval(countdownTimer);const el=$("#payStatus");if(el)el.textContent="Expired";return;}const m=Math.floor(countdownLeftMs/60000);const s=Math.floor((countdownLeftMs%60000)/1000);const cd=$("#countdown");if(cd)cd.textContent=`${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;},1000);
 }
 
-async function afterPaid(){
-  if(submittingShipment||!payToken)return;
-  submittingShipment=true;
-  const url=`${CONFIG.API_BASE}/create-shipment`;
-  try{
-    const res=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:payToken})});
-    if(res.ok){sessionStorage.removeItem(SESSION_INVOICE_KEY);encryptedPII=null;payToken="";["fldName","fldAddr","fldPhone"].forEach(id=>{const f=$("#"+id);if(f)f.value="";});$("#result")?.classList.remove("hidden");if($("#result"))$("#result").textContent="Order placed. Thank you!";cart=[];saveCart();renderDrawerList();renderCheckoutCart();}
-    else if(res.status===409){showInlineError("Відправлення вже існує. Перевірте замовлення через підтримку.");}
-    else{showInlineError("Не вдалося створити відправлення. Повторіть спробу.");}
-  }catch{showInlineError("Не вдалося створити відправлення. Повторіть спробу.");}
-  finally{submittingShipment=false;}
+function afterPaid(){
+  sessionStorage.removeItem(SESSION_INVOICE_KEY);
+  encryptedPII=null;payToken="";
+  ["fldName","fldAddr","fldPhone"].forEach(id=>{const field=$("#"+id);if(field)field.value="";});
+  $("#result")?.classList.remove("hidden");
+  if($("#result"))$("#result").textContent="Payment confirmed. Your order is saved and awaiting shipment.";
+  cart=[];saveCart();renderDrawerList();renderCheckoutCart();
 }
 
 function stopPolling(){clearInterval(pollTimer);pollTimer=null;}
 async function pollOnce(){
   if(!payToken||!payAmountSats||pollInFlight)return;
   pollInFlight=true;
-  const url=`${CONFIG.API_BASE}/pay/status?token=${encodeURIComponent(payToken)}`;
-  let paid=false;let unavailable=false;
-  try{const res=await fetch(url,{cache:"no-store"});if(res.ok){const j=await res.json();paid=j.paid===true;}else unavailable=true;}catch{unavailable=true;}
-  const st=$("#payStatus");
-  if(paid){stopPolling();clearInterval(countdownTimer);if(st)st.textContent="Paid";await afterPaid();}else{if(st)st.textContent=unavailable?"Payment status unavailable. Retrying…":"Not paid yet";}
-  pollInFlight=false;
+  try{
+    const res=await fetch(`${CONFIG.API_BASE}/pay/status?token=${encodeURIComponent(payToken)}`,{cache:"no-store"});
+    const payment=await res.json();
+    const status=$("#payStatus");
+    if(res.ok && payment.paid===true){
+      stopPolling();clearInterval(countdownTimer);
+      if(["PENDING","HANDOFF_READY","FULFILLED"].includes(payment.fulfillmentStatus)){
+        if(status)status.textContent="Payment confirmed";
+        afterPaid();
+      }else if(status)status.textContent="Payment found. Your order needs a support review.";
+    }else{
+      const messages={PENDING:"Awaiting payment",PARTIALLY_PAID:"Partial payment received",
+        CONFIRMING:"Waiting for Bitcoin confirmations",EXPIRED:"Invoice expired. Do not send payment.",
+        LATE_PAYMENT:"Payment arrived after expiry. Contact support.",
+        REORG_REVIEW:"Bitcoin confirmations changed. A support review is required.",
+        INVOICE_REVIEW:"This invoice needs a support review.",
+        PROVIDER_DISAGREEMENT:"Payment verification sources disagree. A support review is required.",
+        ESCROW_MISSING:"Saved delivery details were not found. Contact support."};
+      if(status)status.textContent=messages[payment.status] || "Payment verification is temporarily unavailable. Retrying…";
+    }
+  }catch{const status=$("#payStatus");if(status)status.textContent="Payment verification is temporarily unavailable. Retrying…";}
+  finally{pollInFlight=false;}
 }
 function startPolling(){stopPolling();pollTimer=setInterval(pollOnce,10000);pollOnce();}
 
@@ -295,12 +312,12 @@ function resumePendingInvoice(){
     startCountdown(left);
     startPolling();
     setStage("checkout");
-    showInlineError("Відновлено рахунок. Дані доставки вже зашифровані на сервері.");
+    showInlineError("Invoice restored. Encrypted delivery details are already saved on the server.");
     return true;
   }catch{
     sessionStorage.removeItem(SESSION_INVOICE_KEY);
     return false;
   }
 }
-async function init(){loadCart();animateTitle();await fetchStock();renderGrid(CANDIES);wireNav();wireSearch();setupCopyButtons();if(!resumePendingInvoice())setStage("hero");}
+async function init(){const available=await fetchStock();if(available)loadCart();else showInlineError("The collection is temporarily unavailable. Please refresh later.");renderGrid(CANDIES);wireNav();wireSearch();setupCopyButtons();if(!resumePendingInvoice())setStage("hero");}
 document.addEventListener("DOMContentLoaded",init);

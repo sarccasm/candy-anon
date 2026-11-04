@@ -1,3 +1,4 @@
+import {localStorageOptions} from './local-storage.mjs';
 import { createHash } from 'node:crypto';
 import { validToken, validCiphertext } from './encrypted-fulfillment.mjs';
 
@@ -63,7 +64,7 @@ export async function azureEscrowFromEnvironment() {
   const name=process.env.ENCRYPTED_ESCROW_CONTAINER;
   if(!connection||!name||!/^[a-z0-9-]{3,63}$/.test(name))throw new Error('escrow_not_configured');
   const {BlobServiceClient}=await import('@azure/storage-blob');
-  const container=BlobServiceClient.fromConnectionString(connection).getContainerClient(name);
+  const container=BlobServiceClient.fromConnectionString(connection,localStorageOptions(connection)).getContainerClient(name);
   // Provision a private container before deployment; never create a public one here.
   cached=new DurableEncryptedEscrow(container);
   return cached;

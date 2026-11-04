@@ -12,19 +12,22 @@ test('admin access fails closed without configured secret', async () => {
 test('server controls payment amounts and status lookup', async () => {
   const pay = await readFile(new URL('../edge/PayCreate/index.mjs', import.meta.url), 'utf8');
   const status = await readFile(new URL('../edge/PayStatus/index.mjs', import.meta.url), 'utf8');
+  const processing = await readFile(new URL('../edge/lib/payment-processing.mjs', import.meta.url), 'utf8');
   assert.match(pay, /const catalog = new Map/);
   assert.doesNotMatch(pay, /body\.amountSats|body\.amountUsd/);
-  assert.match(status, /observeBitcoinInvoice/);
-  assert.match(status, /invoice\.amountSats/);
-  assert.match(status, /verification_unavailable/);
+  assert.match(status, /reconcileInvoice/);
+  assert.match(processing, /observeBitcoinInvoice/);
+  assert.match(processing, /invoice\.amountSats/);
+  assert.match(processing, /verification_unavailable/);
   assert.doesNotMatch(status, /req\.query\?\.amountSats/);
 });
 
-test('shipment only persists encrypted address block and requires confirmed invoice', async () => {
+test('shipment delegates to payment verification without local or plaintext persistence', async () => {
   const src = await readFile(new URL('../edge/CreateShipment/index.mjs', import.meta.url), 'utf8');
-  assert.match(src, /invoice\.committed !== true/);
+  assert.match(src, /reconcileInvoice/);
+  assert.match(src, /result.body.paid!==true/);
   assert.doesNotMatch(src, /openpgp\.decrypt|pii\s*:/);
-  assert.match(src, /\.enc\.asc/);
+  assert.doesNotMatch(src, /writeFile|withFileLock/);
 });
 
 test('tracker does not store IP addresses', async () => {

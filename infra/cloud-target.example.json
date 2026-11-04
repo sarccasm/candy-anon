@@ -1,0 +1,10 @@
+{
+  "subscriptionId": null,
+  "resourceGroup": null,
+  "functionAppName": null,
+  "storageAccountName": null,
+  "frontendOrigin": null,
+  "adminOrigin": null,
+  "cloudflareZoneId": null,
+  "alertActionGroupResourceId": null
+}

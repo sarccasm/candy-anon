@@ -35,7 +35,7 @@ async function observe(baseUrl,fetchImpl) {
 }
 async function withTable(fn) {
  const table='T'+randomUUID().replaceAll('-','').slice(0,22);
- const client=TableClient.fromConnectionString(connection,table);
+ const client=TableClient.fromConnectionString(connection,table,{allowInsecureConnection:true});
  await client.createTable();
  try {
   const store=new AzureInvoiceStore(client);

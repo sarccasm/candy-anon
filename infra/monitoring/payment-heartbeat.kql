@@ -1,0 +1,8 @@
+// Scope: the application's Log Analytics workspace.
+// Replace FUNCTION_APP_ROLE_NAME with the observed AppRoleName before creating a rule.
+AppTraces
+| where TimeGenerated > ago(10m)
+| where AppRoleName == 'FUNCTION_APP_ROLE_NAME'
+| where Message startswith 'payment_scan_summary' or Message startswith 'payment_scan_attention'
+| summarize Heartbeats=count()
+| where Heartbeats == 0

@@ -1,13 +1,22 @@
 {
   "bindings": [
     {
-      "authLevel": "function",
+      "authLevel": "anonymous",
       "type": "httpTrigger",
       "direction": "in",
-      "methods": ["post", "options"],
+      "methods": [
+        "post",
+        "options"
+      ],
       "route": "dash/products/update",
       "name": "req"
     },
-    { "type": "http", "direction": "out", "name": "res" }
-  ]
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ],
+  "scriptFile": "index.mjs",
+  "entryPoint": "default"
 }

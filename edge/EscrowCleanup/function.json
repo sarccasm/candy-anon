@@ -7,5 +7,7 @@
       "schedule": "0 0 * * * *",
       "runOnStartup": false
     }
-  ]
+  ],
+  "scriptFile": "index.mjs",
+  "entryPoint": "default"
 }

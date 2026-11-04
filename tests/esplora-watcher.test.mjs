@@ -46,3 +46,14 @@ test('never invents completeness after provider outage',async()=>{
   await assert.rejects(()=>fetchCompleteEsploraHistory({...source,fetchImpl:async()=>({ok:false})}),/provider_unavailable/);
   await assert.rejects(()=>fetchCompleteEsploraHistory({...source,fetchImpl:fake({confirmed:Array.from({length:26},(_,i)=>tx(i+1)),count:26}),maxPages:1}),/history_exceeds_limit/);
 });
+
+test('final height read obeys timeout instead of hanging the background worker',async()=>{
+ const normal=fake();
+ const fetchImpl=async(url,options)=>{
+  if(url.endsWith('/blocks/tip/height'))return new Promise((resolve,reject)=>{
+   options.signal.addEventListener('abort',()=>reject(Error('timed_out')),{once:true});
+  });
+  return normal(url,options);
+ };
+ await assert.rejects(()=>observeBitcoinInvoice({...source,expectedSats:50000,timeoutMs:100,fetchImpl}),/timed_out/);
+});

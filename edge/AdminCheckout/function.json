@@ -1,0 +1,23 @@
+{
+  "scriptFile": "index.mjs",
+  "entryPoint": "default",
+  "bindings": [
+    {
+      "authLevel": "anonymous",
+      "type": "httpTrigger",
+      "direction": "in",
+      "name": "req",
+      "methods": [
+        "get",
+        "post",
+        "options"
+      ],
+      "route": "dash/checkout"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

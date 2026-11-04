@@ -1,0 +1,24 @@
+services:
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck --silent
+    ports:
+      - "127.0.0.1:11000:10000"
+      - "127.0.0.1:11001:10001"
+      - "127.0.0.1:11002:10002"
+    volumes:
+      - storage:/opt/azurite
+  bitcoin:
+    image: bitcoin/bitcoin:29.5
+    command: >-
+      -regtest=1 -server=1 -txindex=1 -fallbackfee=0.0001
+      -rpcbind=0.0.0.0 -rpcallowip=0.0.0.0/0
+      -rpcuser=regtest -rpcpassword=local-regtest-only
+      -printtoconsole=1
+    ports:
+      - "127.0.0.1:19443:18443"
+    volumes:
+      - bitcoin:/home/bitcoin/.bitcoin
+volumes:
+  storage:
+  bitcoin:

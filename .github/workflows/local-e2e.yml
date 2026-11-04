@@ -1,0 +1,40 @@
+name: Local checkout end-to-end
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'edge/**'
+      - 'frontend/**'
+      - 'scripts/**'
+      - 'fixtures/**'
+      - 'compose.local.yml'
+      - 'package*.json'
+      - '.github/workflows/local-e2e.yml'
+jobs:
+  checkout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies and Functions host
+        run: |
+          npm ci
+          npm ci --prefix edge
+          npm ci --prefix frontend
+          npm install --global azure-functions-core-tools@4.1.2 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Exercise real browser, storage, regtest and minute timer
+        run: npm run test:e2e
+      - name: Keep redacted result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-checkout-result
+          path: .local/e2e-report.json
+          if-no-files-found: ignore
+      - name: Stop isolated local services
+        if: always()
+        run: docker compose -p candy-anon-local -f compose.local.yml down

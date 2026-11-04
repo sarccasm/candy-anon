@@ -1,3 +1,4 @@
+import {authorizeLocalRequest} from '../lib/local-request-auth.mjs';
 import { json, options } from '../lib/http.mjs';
 import { invoiceStoreFromEnvironment } from '../lib/azure-invoices.mjs';
 import { validToken, validCiphertext } from '../lib/encrypted-fulfillment.mjs';
@@ -6,6 +7,8 @@ import { azureEscrowFromEnvironment } from '../lib/azure-encrypted-escrow.mjs';
 // Accept encrypted delivery details BEFORE payment, never plaintext. The random
 // invoice token acts as a bearer secret; deploy rate-limits and durable storage.
 export default async function (context, req) {
+  context.res ??= {};
+  if(!authorizeLocalRequest(context,req))return;
   if (req.method === 'OPTIONS') return options(context.res);
   if (req.method !== 'POST') return json(context.res,{error:'method_not_allowed'},405);
   const {token,data} = req.body || {};

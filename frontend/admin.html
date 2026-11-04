@@ -19,12 +19,13 @@ a{color:inherit}
 .menu button.active,.menu button:hover{background:#0f1a2b}
 .menu .dot{width:8px;height:8px;border-radius:999px;background:#334155}
 .menu .txt{flex:1}
-.main{flex:1;display:flex;flex-direction:column}
+.main{min-width:0;flex:1;display:flex;flex-direction:column}
 .top{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0c1526,#0b1220)}
 .pill{background:#0b1a31;border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:#a3b2c7}
 .actions{display:flex;align-items:center;gap:8px}
 .kbd{background:#0b1a31;border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .btn{all:unset;display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:10px;background:#103054;border:1px solid #1a3a64;color:#cfe7ff;cursor:pointer}
+[hidden]{display:none!important}.btn[hidden]{display:none}.btn:disabled{opacity:.5;cursor:wait}.order-attention td{border-color:#854d0e!important}
 .btn:hover{filter:brightness(1.08)}
 .btn-ghost{background:#0b1429;border-color:#15253f;color:#a9b6c8}
 .btn-warn{background:linear-gradient(90deg,#f59e0b,#ef4444);border:0;color:#fff;box-shadow:0 10px 26px #ef444444}
@@ -70,6 +71,7 @@ a{color:inherit}
   <div class="brand"><div class="logo"></div><strong>My Candy Admin</strong></div>
   <div class="menu">
     <button class="active" data-screen="dashboard"><span class="dot"></span><span class="txt">Home</span></button>
+    <button data-screen="orders"><span class="dot"></span><span class="txt">Замовлення</span></button>
     <button data-screen="products"><span class="dot"></span><span class="txt">Products</span></button>
     <button data-screen="analytics"><span class="dot"></span><span class="txt">Analytics</span></button>
     <button data-screen="reviews"><span class="dot"></span><span class="txt">Reviews</span></button>
@@ -133,14 +135,59 @@ a{color:inherit}
     </div>
 
     <div class="card">
-      <h3>Access</h3>
-      <div class="row" style="justify-content:space-between">
-        <div class="badge" id="pubBadge"><span>NOT PUBLISHED</span></div>
-        <div class="row">
-          <div id="switchLive" class="switch"><i></i></div>
-          <button class="btn btn-warn" id="btnPublish">Publish</button>
-        </div>
+      <h3>Приймання нових оплат</h3>
+      <p data-checkout-state>Завантаження…</p>
+      <div class="row"><button class="btn" data-checkout-stop>Зупинити нові оплати</button><button class="btn" data-checkout-start>Увімкнути</button></div>
+      <label class="label" for="checkoutQuote">Чинний курс USD за 1 BTC</label>
+      <div class="row"><input id="checkoutQuote" class="input" type="number" min="0.01" step="0.01" data-checkout-quote><button class="btn" data-checkout-update-quote>Оновити курс</button></div>
+      <p class="small muted">Оновлення вручну підтверджує актуальність курсу на 15 хвилин. Уже видані рахунки зберігають свою суму.</p>
+      <p role="status" data-checkout-message></p>
+      <p class="small muted" data-operations-health></p><button class="btn btn-ghost" data-health-refresh>Перевірити стан сервісів</button>
+    </div>
+  </div>
+
+  <div id="screen-orders" class="container" style="display:none">
+    <div class="card" style="grid-column:1 / -1;min-width:0">
+      <h3>Замовлення та оплати</h3>
+      <div class="row"><input class="input" type="password" autocomplete="off" placeholder="Токен покупця для пошуку підтримкою" aria-label="Токен рахунку" data-order-token><button class="btn" data-order-lookup>Знайти рахунок</button></div>
+      <div class="row" style="flex-wrap:wrap;margin-bottom:12px">
+        <label for="orderFilter">Показати</label>
+        <select id="orderFilter" class="input" style="width:auto" data-order-filter>
+          <option value="all">Усі</option><option value="review">Потребують уваги</option>
+          <option value="paid">Оплачені</option><option value="pending">Очікують оплати / підтверджень</option>
+        </select>
+        <button class="btn" data-order-refresh>Оновити</button>
       </div>
+      <p class="muted small">«Очікує відправлення» означає збережене завдання. Після передавання зашифрованих даних потрібне окреме ручне підтвердження.</p>
+      <p class="muted small" data-order-summary></p>
+      <p aria-live="polite" data-order-message></p>
+      <div style="overflow-x:auto">
+        <table class="table">
+          <thead><tr><th>Номер</th><th>Створено</th><th>До сплати</th><th>Зараховано</th><th>Товари</th><th>Оплата</th><th>Відправлення</th><th>Остання перевірка</th><th>Дії</th></tr></thead>
+          <tbody data-order-rows></tbody>
+        </table>
+      </div>
+      <button class="btn btn-ghost" data-order-more hidden>Завантажити наступні</button>
+      <p role="status" aria-live="polite" data-operation-message></p>
+      <section class="card" hidden data-order-detail>
+        <h3>Замовлення <span class="kbd" data-order-reference></span></h3>
+        <p data-order-detail-status></p><p data-order-review-status></p>
+        <button class="btn btn-ghost" data-order-detail-refresh>Оновити замовлення</button>
+        <h4>Ручне передавання</h4>
+        <p class="small muted">Завантажується лише PGP-шифротекст. Приватний ключ довіреного отримувача залишається поза магазином. Передавайте замовлення один раз за його номером.</p>
+        <button class="btn" data-order-prepare>Підготувати й завантажити шифротекст</button>
+        <label class="label" for="handoffReceipt">Номер квитанції або підтвердження</label><input id="handoffReceipt" class="input" autocomplete="off" maxlength="80" data-order-receipt>
+        <label><input type="checkbox" data-order-attest> Я передав зашифровані дані довіреному отримувачу та маю підтвердження</label>
+        <button class="btn" data-order-ack>Підтвердити ручне передавання</button>
+        <h4>Розгляд проблеми</h4>
+        <select class="input" aria-label="Причина розгляду" data-review-category><option value="PAYMENT_CHECK">Перевірка оплати</option><option value="PARTIAL_PAYMENT">Недоплата</option><option value="LATE_PAYMENT">Пізня оплата</option><option value="STOCK">Залишки товару</option><option value="REFUND_REQUIRED">Потрібне повернення</option><option value="OTHER">Інша проблема</option></select>
+        <button class="btn" data-review-open>Відкрити розгляд і призупинити передавання</button>
+        <select class="input" aria-label="Підстава закриття розгляду" data-review-reason><option value="CHECKED">Перевірено оператором</option><option value="REFUND_RECORDED_EXTERNALLY">Повернення виконане поза магазином</option><option value="NO_ACTION_NEEDED">Додаткові дії не потрібні</option></select>
+        <button class="btn btn-ghost" data-review-close>Закрити розгляд</button>
+        <p class="small muted">Розгляд не змінює підтвердження BTC. Повернення виконуються власником гаманця поза магазином; ця сторінка не надсилає кошти.</p>
+        <h4>Журнал дій</h4><ul data-order-audit></ul>
+      </section>
+      <p class="muted small">Список завантажується частинами. Новіші замовлення відображаються першими серед завантажених. Зарахована сума зафіксована на момент підтвердження оплати.</p>
     </div>
   </div>
 
@@ -212,54 +259,47 @@ a{color:inherit}
 </div>
 
 <script type="module">
-const USE_API_PREFIX=false;
-const BASE=USE_API_PREFIX?'/api/dash':'/dash';
+import {mountAdminOperations} from "./admin-order-operations.js";
+import {mountOrdersPanel} from "./admin-orders.js";
+const BASE='/api/dash';
 let ADMIN_KEY=sessionStorage.getItem('mc_admin_key');if(!ADMIN_KEY){ADMIN_KEY=prompt('Enter admin key')||'';sessionStorage.setItem('mc_admin_key',ADMIN_KEY)}
+const ordersPanel=mountOrdersPanel({root:document.querySelector('#screen-orders'),getAdminKey:()=>ADMIN_KEY,onSelect:reference=>operations.openOrder(reference)});
+const operations=mountAdminOperations({root:document,getAdminKey:()=>ADMIN_KEY,onOrderChanged:()=>ordersPanel.refresh()});
 const withKey=url=>url;
 const authInit=(init={})=>({...init,headers:{'x-admin-key':ADMIN_KEY,...(init.headers||{})}});
 const $=q=>document.querySelector(q),$$=q=>Array.from(document.querySelectorAll(q));
+const escapeHtml=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtUSD=v=>'$'+Number(v).toFixed(2);const fancy=n=>Number(n||0).toLocaleString('en-US');
 const toClock=ms=>{const t=Math.round((ms||0)/1000);const h=String(Math.floor(t/3600)).padStart(2,'0');const m=String(Math.floor((t%3600)/60)).padStart(2,'0');const s=String(t%60).padStart(2,'0');return `${h}:${m}:${s}`};
 function drawSpark(sel,values){const c=$(sel);if(!c)return;const ctx=c.getContext('2d');const w=c.width=c.clientWidth,h=c.height=c.clientHeight;ctx.clearRect(0,0,w,h);if(!values||!values.length)return;const min=Math.min(...values),max=Math.max(...values);const yy=v=>h-((v-min)/(max-min||1))*(h-4)-2;ctx.beginPath();values.forEach((v,i)=>{const x=(i/(values.length-1))*w;i?ctx.lineTo(x,yy(v)):ctx.moveTo(x,yy(v))});ctx.strokeStyle='rgba(34,211,238,.95)';ctx.lineWidth=2;ctx.stroke();ctx.lineTo(w,h);ctx.lineTo(0,h);ctx.closePath();ctx.fillStyle='rgba(34,211,238,.12)';ctx.fill()}
-const DEFAULT_PRODUCTS=[
-  {id:'c1',name:'Strawberry Bliss',price:3.5,units_sold:128,tags:['fruit','soft'],color:'linear-gradient(135deg,#f472b6,#a78bfa)'},
-  {id:'c2',name:'Caramel Comet',price:4.2,units_sold:342,tags:['caramel','chewy'],color:'linear-gradient(135deg,#f59e0b,#f97316)'},
-  {id:'c3',name:'Mint Sparks',price:3.2,units_sold:276,tags:['mint','fresh'],color:'linear-gradient(135deg,#34d399,#22d3ee)'},
-  {id:'c4',name:'Dark Galaxy',price:5.0,units_sold:198,tags:['chocolate','bitter'],color:'linear-gradient(135deg,#7c3aed,#312e81)'},
-  {id:'c5',name:'Red Heart',price:3.7,units_sold:154,tags:['heart','gummy'],color:'linear-gradient(135deg,#ef4444,#f97316)'},
-  {id:'c6',name:'Peachy Blue',price:3.4,units_sold:221,tags:['berry','hard'],color:'linear-gradient(135deg,#60a5fa,#22d3ee)'}
-];
+
 let SNAP=null;let PRODUCTS=[];let EDIT_INDEX=null;
 async function loadSnapshot(){
-  try{const res=await fetch(withKey(`${BASE}/snapshot`),authInit());SNAP=await res.json()}catch{SNAP=null}
+  try{const res=await fetch(withKey(`${BASE}/snapshot`),authInit());if(!res.ok)throw Error('snapshot_failed');SNAP=await res.json()}catch{SNAP=null}
   const snapOk=SNAP&&typeof SNAP==='object';
   $('#adminId').textContent=snapOk?(SNAP.user||'—'):'—';
-  PRODUCTS=Array.isArray(SNAP?.products)&&SNAP.products.length?SNAP.products:DEFAULT_PRODUCTS.slice();
+  PRODUCTS=Array.isArray(SNAP?.products)?SNAP.products:[];
   renderProducts();renderProductsEditor();
   const an=snapOk?(SNAP.analytics||{}):{users:0,hits:0,avg_session:'00:00:00',pages_per_session:0,series:{users:[],hits:[],avg:[],pps:[]}};
   $('#mUsers').textContent=fancy(an.users||0);$('#mHits').textContent=fancy(an.hits||0);$('#mDur').textContent=an.avg_session??toClock(0);$('#mPps').textContent=(an.pages_per_session??0).toFixed(2);
   const s=an.series||{};drawSpark('#sp1',s.users||[]);drawSpark('#sp2',s.hits||[]);drawSpark('#sp3',(s.avg||[]).map(Number));drawSpark('#sp4',(s.pps||[]).map(Number));
   $('#srvIp').textContent=snapOk?(SNAP.hosting?.server_ip||'—'):'—';$('#domName').textContent=snapOk?(SNAP.hosting?.domain||'—'):'—';$('#hIp').textContent=$('#srvIp').textContent;
-  uiPublishState(!!SNAP?.access?.published);
+  if(SNAP?.checkout)operations.setPolicy(SNAP.checkout);
 }
-function renderProducts(list=PRODUCTS){const tb=$('#prodRows');tb.innerHTML='';list.forEach((p,i)=>{const tr=document.createElement('tr');tr.innerHTML=`<td><span class="icon" style="background:${p.color||'linear-gradient(135deg,#60a5fa,#22d3ee)'}"></span></td><td>${p.name}</td><td>${p.units_sold??0}</td><td>${fmtUSD(Number(p.price??p.usd??0))}</td><td class="right"><button class="btn btn-ghost" data-edit="${i}">Edit</button></td>`;tb.appendChild(tr)});tb.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openModal(+b.dataset.edit))}
-function renderProductsEditor(){const tb=$('#prodEditRows');if(!tb)return;tb.innerHTML='';PRODUCTS.forEach((p,i)=>{const tr=document.createElement('tr');tr.innerHTML=`<td><span class="icon" style="background:${p.color||'linear-gradient(135deg,#60a5fa,#22d3ee)'}"></span></td><td>${p.name}</td><td>${fmtUSD(Number(p.price??0))}</td><td>${(p.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</td><td class="right"><button class="btn btn-ghost" data-edit="${i}">Edit</button></td>`;tb.appendChild(tr)});tb.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openModal(+b.dataset.edit))}
+function renderProducts(list=PRODUCTS){const tb=$('#prodRows');tb.innerHTML='';list.forEach((p,i)=>{const tr=document.createElement('tr');tr.innerHTML=`<td><span class="icon" style="background:linear-gradient(135deg,#60a5fa,#22d3ee)"></span></td><td>${escapeHtml(p.name)}</td><td>${p.units_sold??0}</td><td>${fmtUSD(Number(p.price??p.usd??0))}</td><td class="right"><button class="btn btn-ghost" data-edit="${PRODUCTS.indexOf(p)}">Edit</button></td>`;tb.appendChild(tr)});tb.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openModal(+b.dataset.edit))}
+function renderProductsEditor(){const tb=$('#prodEditRows');if(!tb)return;tb.innerHTML='';PRODUCTS.forEach((p,i)=>{const tr=document.createElement('tr');tr.innerHTML=`<td><span class="icon" style="background:linear-gradient(135deg,#60a5fa,#22d3ee)"></span></td><td>${escapeHtml(p.name)}</td><td>${fmtUSD(Number(p.price??0))}</td><td>${(p.tags||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('')}</td><td class="right"><button class="btn btn-ghost" data-edit="${PRODUCTS.indexOf(p)}">Edit</button></td>`;tb.appendChild(tr)});tb.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openModal(+b.dataset.edit))}
 function openModal(i){EDIT_INDEX=i;const p=PRODUCTS[i];$('#mName').value=p?.name??'';$('#mPrice').value=Number(p?.price??0);$('#mTags').value=(p?.tags||[]).join(', ');$('#modal').classList.add('show')}
 function closeModal(){$('#modal').classList.remove('show');EDIT_INDEX=null}
 $('#mCancel').onclick=closeModal;
-$('#mSave').onclick=async()=>{const name=$('#mName').value.trim();const price=Math.max(0,Number($('#mPrice').value||0));const tags=$('#mTags').value.split(',').map(s=>s.trim()).filter(Boolean);if(EDIT_INDEX==null)return;const prod=PRODUCTS[EDIT_INDEX];try{const r=await fetch(withKey(`${BASE}/products/update`),authInit({method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:prod.id,price})}));const j=await r.json().catch(()=>({}));if(!j.ok)throw new Error(j.error||'update_failed');prod.price=price;if(name)prod.name=name;prod.tags=tags;renderProducts();renderProductsEditor();closeModal()}catch(e){alert('Save failed: '+e.message)}};
-$('#btnAdd').onclick=()=>alert('Create через бекенд. Додай товар у state.json та ендпоінт створення.');
+$('#mSave').onclick=async()=>{const name=$('#mName').value.trim();const price=Math.max(0,Number($('#mPrice').value||0));const tags=$('#mTags').value.split(',').map(s=>s.trim()).filter(Boolean);if(EDIT_INDEX==null)return;const prod=PRODUCTS[EDIT_INDEX];try{const r=await fetch(withKey(`${BASE}/products/update`),authInit({method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:prod.id,name,price,tags,version:SNAP?.catalogVersion})}));const j=await r.json().catch(()=>({}));if(!j.ok)throw new Error(j.error||'update_failed');closeModal();await loadSnapshot()}catch(e){if(e.message==='catalog_conflict')await loadSnapshot();alert('Save failed: '+e.message)}};
+$('#btnAdd').onclick=()=>alert('Додавання товарів поки доступне лише через міграцію каталогу.');
 $('#pSearch').oninput=()=>{const q=$('#pSearch').value.toLowerCase();const filtered=PRODUCTS.filter(p=>(p.name||'').toLowerCase().includes(q)||(p.tags||[]).join(' ').toLowerCase().includes(q));renderProducts(filtered)};
 $('#pReset').onclick=()=>{$('#pSearch').value='';renderProducts()};
-function uiPublishState(published){$('#switchLive').classList.toggle('on',!!published);$('#pubBadge').innerHTML=published?'<span style="color:#10b981">PUBLISHED</span>':'<span>NOT PUBLISHED</span>'}
-$('#switchLive').onclick=async()=>{const want=!$('#switchLive').classList.contains('on');await setPublished(want)};
-$('#btnPublish').onclick=async()=>{await setPublished(true)};
-async function setPublished(published){try{const r=await fetch(withKey(`${BASE}/publish`),authInit({method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({published})}));const j=await r.json().catch(()=>({}));if(!j.ok)throw new Error(j.error||'publish_failed');uiPublishState(published)}catch(e){alert('Publish failed: '+e.message)}}
 const reviewsKey='mc_reviews';
-function renderReviews(){const list=JSON.parse(localStorage.getItem(reviewsKey)||'[]');const box=$('#reviewsBox');box.textContent='';if(!list.length){box.textContent='no new reviews';return}list.slice(-5).reverse().forEach(r=>{const div=document.createElement('div');div.className='row';div.style.justifyContent='space-between';div.innerHTML=`<div>${r.text}</div><span class="kbd small">${new Date(r.ts).toLocaleString()}</span>`;box.appendChild(div)});const rl=$('#revList');if(!rl)return;rl.innerHTML='';list.slice().reverse().forEach(r=>{const it=document.createElement('div');it.className='metric';it.innerHTML=`<div>${r.text}</div><div class="muted small">${new Date(r.ts).toLocaleString()}</div>`;rl.appendChild(it)})}
+function renderReviews(){const list=JSON.parse(localStorage.getItem(reviewsKey)||'[]');const box=$('#reviewsBox');box.textContent='';if(!list.length){box.textContent='no new reviews';return}list.slice(-5).reverse().forEach(r=>{const div=document.createElement('div');div.className='row';div.style.justifyContent='space-between';div.innerHTML=`<div>${escapeHtml(r.text)}</div><span class="kbd small">${new Date(r.ts).toLocaleString()}</span>`;box.appendChild(div)});const rl=$('#revList');if(!rl)return;rl.innerHTML='';list.slice().reverse().forEach(r=>{const it=document.createElement('div');it.className='metric';it.innerHTML=`<div>${escapeHtml(r.text)}</div><div class="muted small">${new Date(r.ts).toLocaleString()}</div>`;rl.appendChild(it)})}
 $('#revAdd')?.addEventListener('click',()=>{const v=$('#revInput').value.trim();if(!v)return;const list=JSON.parse(localStorage.getItem(reviewsKey)||'[]');list.push({text:v,ts:Date.now()});localStorage.setItem(reviewsKey,JSON.stringify(list));$('#revInput').value='';renderReviews()});
-const navBtns=$$('.menu button');navBtns.forEach(b=>b.onclick=()=>{navBtns.forEach(x=>x.classList.remove('active'));b.classList.add('active');const id='screen-'+b.dataset.screen;['dashboard','products','analytics','reviews','hosting','access'].forEach(s=>$('#screen-'+s).style.display='none');$('#'+id).style.display='';if(id==='screen-products')renderProductsEditor();if(id==='screen-reviews')renderReviews();if(id==='screen-analytics'){const an=SNAP?.analytics||{};drawSpark('#rt1',an.series?.users||[]);drawSpark('#rt2',an.series?.hits||[]);$('#rtUsers').textContent=fancy(an.users||0);$('#rtPays').textContent=Math.max(0,Math.round((an.hits||0)/100))}});
-$('#btnLogout').onclick=()=>{localStorage.removeItem('mc_admin_key');location.reload()};
+const navBtns=$$('.menu button');navBtns.forEach(b=>b.onclick=()=>{navBtns.forEach(x=>x.classList.remove('active'));b.classList.add('active');const id='screen-'+b.dataset.screen;['dashboard','orders','products','analytics','reviews','hosting','access'].forEach(s=>$('#screen-'+s).style.display='none');$('#'+id).style.display='';if(id==='screen-orders'&&!ordersPanel.snapshot().loaded)ordersPanel.load();if(id==='screen-products')renderProductsEditor();if(id==='screen-reviews')renderReviews();if(id==='screen-analytics'){const an=SNAP?.analytics||{};drawSpark('#rt1',an.series?.users||[]);drawSpark('#rt2',an.series?.hits||[]);$('#rtUsers').textContent=fancy(an.users||0);$('#rtPays').textContent=Math.max(0,Math.round((an.hits||0)/100))}});
+$('#btnLogout').onclick=()=>{sessionStorage.removeItem('mc_admin_key');location.reload()};
 (async function init(){try{await loadSnapshot()}catch{alert('Failed to load dashboard')}renderReviews();window.addEventListener('resize',()=>{const an=SNAP?.analytics||{};const s=an.series||{};drawSpark('#sp1',s.users||[]);drawSpark('#sp2',s.hits||[]);drawSpark('#sp3',(s.avg||[]).map(Number));drawSpark('#sp4',(s.pps||[]).map(Number))})})();
 </script>
 </body>

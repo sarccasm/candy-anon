@@ -1,0 +1,6 @@
+{
+  "cloudMutationsAllowed": false,
+  "externalDeploymentAllowed": false,
+  "paidResourcesAllowed": false,
+  "mode": "local-only"
+}
